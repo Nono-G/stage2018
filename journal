@@ -1,0 +1,174 @@
+login: noe.goudian
+pwd: thotheeN5d
+
+
+Lundi 5 Février : 9H - 12H 13H - 18H 
+Arrivée au CMI, Farah fait visiter, rdv SA matin -> pistes docs :
+Keras, adversarial net, TFlow, Automates pondérés, apprentissage spectral
+
+Mardi 6 Février :
+Exam le matin, convention a Luminy aprèm,
+Après pas le temps de venir.
+
+Mercredi 7 Février : 8H - 18h30 (ns)
+Python pendant deux heures, ensuite tentative d'installation de TF
+Fonctionne pas, peut-être car Ubuntu 14.04, mise a niveau vers 16.04
+Finalement résolution des problèmes, downgrade pip, premiers réseaux sur MNIST
+
+Jeudi 8 Février : 8H - 17H15 (ns)
+Python pendant deux heures
+conférence bitcoin à midi
+retours sur les réseaux MNIST -> fix erreurs dans mon parseur
+maintenant je gère assez bien venv/pip
+premiers réseaux sur SPICE ? fonctionne trop bien pour être honnête ?
+
+
+Vendredi 9 Février : 9H30 - 14H
+Spice fonctionnait bien car sur le bourage ! Maintenant il fonctionne mal comme prévu
+réunion du vendredi, exposé Farah, ...
+spice essais divers
+
+Lundi 12 Février : 9h00 - 12h00 13h-18h
+Retouches spiceparse mais finalement pas utile, essais avec plus de neuronnes, plus d'epochs, toujours pas de résultats intéréssants
+lecture docs sur LSTM, pas mieux ?
+Mauvaises performances car retourne toujours le plus fréquent ("3"). -> Mêmes résultats avec 100 ou 10 ou 1 neuronnes, comment ça se fait ?
+Docs TF, LSTM, ...
+Discussion RE -> Caractères 1 par 1 ? fenetre glissante y compris au début
+tentatvies utilisation du cluster, encore des problèmes, TF 1.5 trop en avance sur CUDA ?
+
+Mardi 13 Février : 8h00 - 12h 13h - 17h
+SA me montre cluster (effectivement problème de version TF + d'autres), divers docs, nouveau parseur
+Avec nouveau parseur efficace environ 40% sur couches taille 10, c'est mieux ! vrai réponses et pas juste la plus probable
+En ajustant un peu longueur de fenetre et nb de neuronnes, on obtient jusqu'à 80%, mais on retrouve un peu le "biais de bourrage"
+fenetres multiples et bourrage partout pour compenser, tests en cours.
+Lancement sur cluster (asfalda1), ça va moins vite que local !?! La faute a PV ?
+
+Mercredi 14 Février : 9h30 - 12h40 13h40 - 18h30
+Mini réunion SA et RE, je continue les expérimentations spice
+Local plus rapide que adnvideo1 !
+Entrées en argument, on lance toutes les taches sur clusters a la fois, il faudra décortiquer
+décortiquage : bon pas mauvais mais pas top non plus, voir papiers
+Lectures très bonnes docs collah sur LSTM et RNN et autres
+Lectures docs Keras sur embedding, padding -> il le fait vraisemblablement mieux que moi, a tester
+Je lance sur le cluster pour la nuit les memes trucs mais avec les données 1. Wall sera suffisant ?
+
+
+Jeudi 15 Février : 10h -
+6 sur 18 ont terminé cette nuit, Wall trop court pour les autres, ils sont décevants : apprentissage du plus fréquent
+Pas la peine de relancer les autres, si il faut attendre deux heures, autant étudier la couche mbed
+Vendredi 16 Février :
+
+Lundi 19 Février :
+Mardi 20 Février :
+Mercredi 21 Février :
+Jeudi 22 Février :
+Vendredi 23 Février :
+
+Lundi 26 Février :
+Mardi 27 Février :
+Mercredi 28 Février :
+Jeudi 1 Mars :
+Vendredi 2 Mars :
+
+Lundi 5 Mars :
+Mardi 6 Mars :
+Mercredi 7 Mars :
+Jeudi 8 Mars :
+Vendredi 9 Mars :
+
+Lundi 12 Mars :
+Mardi 13 Mars :
+Mercredi 14 Mars :
+Jeudi 15 Mars :
+Vendredi 16 Mars :
+
+Lundi 19 Mars :
+Mardi 20 Mars :
+Mercredi 21 Mars :
+Jeudi 22 Mars :
+Vendredi 23 Mars :
+
+Lundi 26 Mars :
+Mardi 27 Mars :
+Mercredi 28 Mars :
+Jeudi 29 Mars :
+Vendredi 30 Mars :
+
+Lundi 2 Avril :
+Mardi 3 Avril :
+Mercredi 4 Avril :
+Jeudi 5 Avril :
+Vendredi 6 Avril :
+
+Lundi 9 Avril :
+Mardi 10 Avril :
+Mercredi 11 Avril :
+Jeudi 12 Avril :
+Vendredi 13 Avril :
+
+Lundi 16 Avril :
+Mardi 17 Avril :
+Mercredi 18 Avril :
+Jeudi 19 Avril :
+Vendredi 20 Avril :
+
+Lundi 23 Avril :
+Mardi 24 Avril :
+Mercredi 25 Avril :
+Jeudi 26 Avril :
+Vendredi 27 Avril :
+
+Lundi 30 Avril :
+Mardi 1 Mai :
+Mercredi 2 Mai :
+Jeudi 3 Mai :
+Vendredi 4 Mai :
+
+Lundi 7 Mai :
+Mardi 8 Mai :
+Mercredi 9 Mai :
+Jeudi 10 Mai :
+Vendredi 11 Mai :
+
+Lundi 14 Mai :
+Mardi 15 Mai :
+Mercredi 16 Mai :
+Jeudi 17 Mai :
+Vendredi 18 Mai :
+
+Lundi 21 Mai :
+Mardi 22 Mai :
+Mercredi 23 Mai :
+Jeudi 24 Mai :
+Vendredi 25 Mai :
+
+Lundi 28 Mai :
+Mardi 29 Mai :
+Mercredi 30 Mai :
+Jeudi 31 Mai :
+Vendredi 1 Juin :
+
+Lundi 4 Juin :
+Mardi 5 Juin :
+Mercredi 6 Juin :
+Jeudi 7 Juin :
+Vendredi 8 Juin :
+
+Lundi 11 Juin :
+Mardi 12 Juin :
+Mercredi 13 Juin :
+Jeudi 14 Juin :
+Vendredi 15 Juin :
+
+Lundi 18 Juin :
+Mardi 19 Juin :
+Mercredi 20 Juin :
+Jeudi 21 Juin :
+Vendredi 22 Juin :
+
+Lundi 25 Juin :
+Mardi 26 Juin :
+Mercredi 27 Juin :
+Jeudi 28 Juin :
+Vendredi 29 Juin :
+
