@@ -1,0 +1,18 @@
+'1' 5 data/1.train 200 3 16
+'3' 5 data/1.train 200 3 16
+'5' 10 data/1.train 200 3 16
+'10' 12 data/1.train 200 3 16
+'3 5 8' 10 data/1.train 200 3 16
+'10 20 50' 55 data/1.train 200 3 16
+'1' 5 data/1.train 400 3 16
+'3' 5 data/1.train 400 3 16
+'5' 10 data/1.train 400 3 16
+'10' 12 data/1.train 400 3 16
+'3 5 8' 10 data/1.train 400 3 16
+'10 20 50' 55 data/1.train 400 3 16
+'1' 5 data/1.train 50 3 16
+'3' 5 data/1.train 50 3 16
+'5' 10 data/1.train 50 3 16
+'10' 12 data/1.train 50 3 16
+'3 5 8' 10 data/1.train 50 3 16
+'10 20 50' 55 data/1.train 50 3 16
