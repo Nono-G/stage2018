@@ -75,6 +75,8 @@ J'ai épluché les résultats sur les données 6 : plutôt bien, s'améliore tou
 Faut-il faire une expérience avec beaucoup de neuronnes ? peut être temps de passer à autre chose,
 Je vais essayer de me consacrer au spectral cette semaine.
 Réunion SA et RE : faire la métrique spéciale dans spicetest, continuer lecture spectrale
+Aprem, recherches sur metric perso dans keras : en fait ça va être un pb a cause du mélange sur l'ordre des trucs
+Mais on va essayer de sortir les résultats et de s'en servir comme on peut, on verra bien.
 
 Mardi 20 Février :
 Mercredi 21 Février :

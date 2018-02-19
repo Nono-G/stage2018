@@ -37,8 +37,6 @@ modelname = ("model-MB-W"+sys.argv[1]+
     .replace(" ", "_").replace("/", "+")
 
 nalpha, x_train, y_train = parse.parse_train(train_file, wid)
-# print(y_train)
-# print(nalpha)
 
 print(x_train.shape)
 # print(y_train.shape)
@@ -58,7 +56,7 @@ model.add(keras.layers.Dense(len(y_train[0])))
 model.add(keras.layers.Activation('softmax'))
 print(model.summary())
 
-
-model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy", metrics=['categorical_accuracy'])
+model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",\
+              metrics=['categorical_accuracy'])
 model.fit(x_train, y_train, batch, epochs)
 model.save(modelname)
