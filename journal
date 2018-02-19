@@ -28,13 +28,15 @@ Spice fonctionnait bien car sur le bourage ! Maintenant il fonctionne mal comme 
 réunion du vendredi, exposé Farah, ...
 spice essais divers
 
+--> S1 : 8+(7)+10.5+4.5+9.75 = 39.75
+
 Lundi 12 Février : 9h00 - 12h00 13h-18h
 Retouches spiceparse mais finalement pas utile, essais avec plus de neuronnes, plus d'epochs, toujours pas de résultats intéréssants
 lecture docs sur LSTM, pas mieux ?
 Mauvaises performances car retourne toujours le plus fréquent ("3"). -> Mêmes résultats avec 100 ou 10 ou 1 neuronnes, comment ça se fait ?
 Docs TF, LSTM, ...
 Discussion RE -> Caractères 1 par 1 ? fenetre glissante y compris au début
-tentatvies utilisation du cluster, encore des problèmes, TF 1.5 trop en avance sur CUDA ?
+tentatives utilisation du cluster, encore des problèmes, TF 1.5 trop en avance sur CUDA ?
 
 Mardi 13 Février : 8h00 - 12h 13h - 17h
 SA me montre cluster (effectivement problème de version TF + d'autres), divers docs, nouveau parseur
@@ -52,16 +54,31 @@ Lectures très bonnes docs collah sur LSTM et RNN et autres
 Lectures docs Keras sur embedding, padding -> il le fait vraisemblablement mieux que moi, a tester
 Je lance sur le cluster pour la nuit les memes trucs mais avec les données 1. Wall sera suffisant ?
 
-
-Jeudi 15 Février : 10h -
+Jeudi 15 Février : 10h - 13h 14h - 18h30
 6 sur 18 ont terminé cette nuit, Wall trop court pour les autres, ils sont décevants : apprentissage du plus fréquent
 Pas la peine de relancer les autres, si il faut attendre deux heures, autant étudier la couche mbed
-Vendredi 16 Février :
+nouveau parseur pour aller avec l'embedding, mise en git car ça devient chiant a gérer tout en scp
+ça marche mieux avec embed+parse3, je lance des travaux sur le cluster avant le repas, on décortique après manger
+Après manger toujours pas fini, en fait j'avais relancé sur le jeu 1, mais celui-ci est trop gros, donc j'ai relancé sur jeu 0, en attendant je fais de l'algèbre et j'attaque les articles sur WFA
+Toujours pas fini en fin d'aprem, décidement beaucoup plus long, j'ai mis a cuire pour la nuit on verra demain
 
-Lundi 19 Février :
+Vendredi 16 Février : 8h30 - 12h30
+Ce matin certains ont fini, d'autres sont encore en cours, ils ont commencé plus tard, on va extraire ce qu'on a pour commencer. ça finit a peu près au fur et a mesure
+Les résultats sont globalement meilleurs, et en tout cas plus eq.
+Réunion du Vendredi
+Début doc SciKit Learn et SP2 Learn
+
+--> S2 : 8+8+8+7.5+4 = 35.5
+
+Lundi 19 Février : 8h - 12h10 13h10 - 17h
+J'ai épluché les résultats sur les données 6 : plutôt bien, s'améliore toujours avec plus de neuronnes
+Faut-il faire une expérience avec beaucoup de neuronnes ? peut être temps de passer à autre chose,
+Je vais essayer de me consacrer au spectral cette semaine.
+Réunion SA et RE : faire la métrique spéciale dans spicetest, continuer lecture spectrale
+
 Mardi 20 Février :
 Mercredi 21 Février :
-Jeudi 22 Février :
+Jeudi 22 Février : Conférence St-Charles
 Vendredi 23 Février :
 
 Lundi 26 Février :
@@ -94,7 +111,7 @@ Mercredi 28 Mars :
 Jeudi 29 Mars :
 Vendredi 30 Mars :
 
-Lundi 2 Avril :
+Lundi 2 Avril : LUNDI DE PAQUES
 Mardi 3 Avril :
 Mercredi 4 Avril :
 Jeudi 5 Avril :
@@ -119,15 +136,15 @@ Jeudi 26 Avril :
 Vendredi 27 Avril :
 
 Lundi 30 Avril :
-Mardi 1 Mai :
+Mardi 1 Mai : FETE DU TRAVAIL
 Mercredi 2 Mai :
 Jeudi 3 Mai :
 Vendredi 4 Mai :
 
 Lundi 7 Mai :
-Mardi 8 Mai :
+Mardi 8 Mai : ARMISTICE 45
 Mercredi 9 Mai :
-Jeudi 10 Mai :
+Jeudi 10 Mai : ASCENSION
 Vendredi 11 Mai :
 
 Lundi 14 Mai :
@@ -136,7 +153,7 @@ Mercredi 16 Mai :
 Jeudi 17 Mai :
 Vendredi 18 Mai :
 
-Lundi 21 Mai :
+Lundi 21 Mai : PENTECOTE
 Mardi 22 Mai :
 Mercredi 23 Mai :
 Jeudi 24 Mai :

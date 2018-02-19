@@ -4,3 +4,4 @@ spicetest/.idea/*
 spicetest/venv/bin/*
 spicetest/venv/lib/*
 spicetest/venv/include/*
+spicetest/data/*
