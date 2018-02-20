@@ -75,13 +75,20 @@ J'ai épluché les résultats sur les données 6 : plutôt bien, s'améliore tou
 Faut-il faire une expérience avec beaucoup de neuronnes ? peut être temps de passer à autre chose,
 Je vais essayer de me consacrer au spectral cette semaine.
 Réunion SA et RE : faire la métrique spéciale dans spicetest, continuer lecture spectrale
-Aprem, recherches sur metric perso dans keras : en fait ça va être un pb a cause du mélange sur l'ordre des trucs
-Mais on va essayer de sortir les résultats et de s'en servir comme on peut, on verra bien.
+Bon la métrique ça marchera probablement pas a cause de la mise en désordre, mais on pourra évaluer à posteriori
+Relance des expériences sur données 8 et avec fenetre "maximale"
 
-Mardi 20 Février :
+Mardi 20 Février : 8h30 - 13h15 13h15 - 17h30
+Certains n'ont pas fini, et ils risquent de déborder le walltime, merde. Il y en a un, je sais pas lequel qui est à 12h/epoch environ
+On va essayer d'extraire le reste pour commencer.
+Du coup finalement j'ai pas encore attaqué a extraire, mais j'ai préparé la métrique, on peut la mesurer a posteriori
+ça a pas été très facile, adaptation Python2/3, bug bête de ma part, best_n, ...
+J4ai aussi mis en place une sauvegarde du modele après chaque epoch, ça évitera les incidents malheureux de manque de walltime a pas grand chose
+
 Mercredi 21 Février :
 Jeudi 22 Février : Conférence St-Charles
 Vendredi 23 Février :
+
 
 Lundi 26 Février :
 Mardi 27 Février :

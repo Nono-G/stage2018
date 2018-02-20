@@ -1,6 +1,8 @@
 import keras
 import parse3 as parse
+import score as sc
 import sys
+import numpy as np
 # extra imports to set GPU options
 import tensorflow as tf
 from keras import backend as k
@@ -32,8 +34,8 @@ def prec_seq(y_test, pred):
             print(str(x)+":", str(occ_faux[x])+"/"+str(faux), "->", occ_faux[x]/faux, sep="\t")
 
 
-if len(sys.argv) != 4:
-    sys.exit("ARGS : wid file model")
+if len(sys.argv) != 5:
+    sys.exit("ARGS : wid prefixes model targets")
 
 ###################################
 # TensorFlow wizardry
@@ -54,14 +56,26 @@ k.tensorflow_backend.set_session(tf.Session(config=config))
 wid = int(sys.argv[1])
 test_file = sys.argv[2]
 model_file = sys.argv[3]
+targets_file = sys.argv[4]
 
-a, x_test, y_test = parse.parse_train(test_file, wid)
+# a, x_test, y_test = parse.parse_train(test_file, wid)
+a, x_test = parse.parse_test_prefixes(test_file, wid)
+y_test = parse.parse_targets(targets_file, a)
 # print(x_test)
 print(x_test.shape)
 model = keras.models.load_model(model_file)
 scores = model.evaluate(x_test, y_test)
-pred = model.predict(x_test, len(x_test))
 print(scores)
-# print(pred)
+pred = model.predict(x_test, len(x_test))
+pred = np.array([parse.best_n_args(aaa, 5) for aaa in pred])
+s = sc.calc_score(pred, targets_file)
+print(s)
+
+# with open("ret", "w") as fret:
+#     for seq in pred:
+#         for i in seq:
+#             fret.write(str(i)+" ")
+#         fret.write("\n")
+
 # print([parse.argmax(x) for x in pred])
-prec_seq(y_test, pred)
+# prec_seq(y_test, pred)

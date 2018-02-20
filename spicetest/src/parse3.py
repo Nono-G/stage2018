@@ -21,11 +21,39 @@ def parse_train(filename, wid=-1):
     return nalpha, np.array(xs), np.array(ys)
 
 
+def parse_test_prefixes(filename, wid):
+    xs = []
+    maxlen = 0
+    with open(filename, 'r') as file:
+        nsamples, nalpha = [int(a) for a in file.readline().split()]
+        for line in file.readlines():
+            x = [nalpha+1]+[int(a)+1 for a in line.split()[1:]]
+            if wid > 0:
+                if len(x) > wid:
+                    x = x[-wid:]
+                else:
+                    x = pad_0(x, wid)
+            else:
+                if len(x) > maxlen:
+                    maxlen = len(x)
+            xs += [x]
+    if wid < 1:
+        # On finit le padding jusqu'a maxlen :
+        xs = [pad_0(a, maxlen) for a in xs]
+    return nalpha, np.array(xs)
+
+
+def parse_targets(targets_file, nalpha):
+    targ = []
+    with open(targets_file, 'r') as tarf:
+        for line in tarf.readlines():
+            targ += [onehot(int(line.split()[1]), nalpha+2)]
+    return np.array(targ)
+
 def parse_line(line, nalpha, widarg):
     # on ajoute 1 partout pour que le zero soit libre pour servir de bourrage :
     sp = line.split()
     linelen = int(sp[0])
-    wid = 0
     if widarg == -1:
         wid = linelen+1
     else:
@@ -66,8 +94,13 @@ def argmax(x):
     return arg
 
 
+def best_n_args(seq, n):
+    return np.argsort(seq)[::-1][:n]
+
+
 if __name__ == "__main__":
     print("coucou")
-    n, x, y = parse_train("../data/00.spice")
-    print(x)
-    print(y)
+    n_zz, x_zz = parse_test_prefixes("../data/prefixes/8.spice.prefix.public", 12)
+    y_zz = parse_targets("../data/targets/8.spice.target.public", n_zz)
+    # print(x)
+    print(y_zz)
