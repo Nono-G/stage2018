@@ -4,10 +4,11 @@ import sys
 # extra imports to set GPU options
 import tensorflow as tf
 from keras import backend as k
+import numpy as np
 
 
-if len(sys.argv) != 6:
-    sys.exit("ARGS : wid file neurons epochs batch")
+if len(sys.argv) < 6 or len(sys.argv) > 8:
+    sys.exit("ARGS : wid file neurons epochs batch [sampleNB] [modelname]")
 
 ###################################
 # TensorFlow wizardry
@@ -23,26 +24,31 @@ config.gpu_options.per_process_gpu_memory_fraction = 0.33
 k.tensorflow_backend.set_session(tf.Session(config=config))
 ###################################
 
-
-# https://machinelearningmastery.com/return-sequences-and-return-states-for-lstms-in-keras/
-# windows_widths = [int(s) for s in sys.argv[1].split()]
 wid = int(sys.argv[1])
 train_file = sys.argv[2]
+# train_file = "../data/00.spice"
 neurons = int(sys.argv[3])
 epochs = int(sys.argv[4])
 batch = int(sys.argv[5])
-modelname = ("model-MB-W"+sys.argv[1]+
-             "F"+sys.argv[2]+"N"+sys.argv[3] +
-             "E"+sys.argv[4]+"B"+sys.argv[5])\
-    .replace(" ", "_").replace("/", "+")
+if len(sys.argv) > 6:
+    sampleNB = int(sys.argv[6])
+    # sampleNB = -1
+else:
+    sampleNB = -1
+name = ""
+if len(sys.argv) > 7:
+    name = sys.argv[7]
 
+modelname = ("model-{0}-W{1}F{2}N{3}E{4}B{5}S{6}"
+             .format(name, wid, train_file, neurons, epochs, batch, sampleNB)
+             .replace(" ", "_")
+             .replace("/", "+"))
 print(modelname)
-nalpha, x_train, y_train = parse.parse_train(train_file, wid)
 
+nalpha, x_train, y_train = parse.parse_train(train_file, wid, padbefore=True)
+if -1 < sampleNB < len(x_train):
+    x_train, y_train = parse.random_sample(x_train, y_train, sampleNB)
 print(x_train.shape)
-# print(y_train.shape)
-# print(x_train)
-# print(y_train)
 
 model = keras.models.Sequential()
 model.add(keras.layers.Embedding(nalpha+3, 40, input_shape=x_train[0].shape, mask_zero=True))
@@ -56,7 +62,7 @@ model.add(keras.layers.Dense(len(y_train[0])))
 model.add(keras.layers.Activation('softmax'))
 print(model.summary())
 
-model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",\
+model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",
               metrics=['categorical_accuracy'])
 for i in range(epochs):
     model.fit(x_train, y_train, batch, 1)

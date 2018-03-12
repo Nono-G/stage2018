@@ -28,42 +28,58 @@ Spice fonctionnait bien car sur le bourage ! Maintenant il fonctionne mal comme 
 réunion du vendredi, exposé Farah, ...
 spice essais divers
 
---> S1 : 8+(7)+10.5+4.5+9.75 = 39.75
+--> S1 : 8+(7)+10.5+9.75+4.5 = 39.75
 
 Lundi 12 Février : 9h00 - 12h00 13h-18h
-Retouches spiceparse mais finalement pas utile, essais avec plus de neuronnes, plus d'epochs, toujours pas de résultats intéréssants
+Retouches spiceparse mais finalement pas utile, essais avec plus de neuronnes, plus 
+d'epochs, toujours pas de résultats intéréssants
 lecture docs sur LSTM, pas mieux ?
-Mauvaises performances car retourne toujours le plus fréquent ("3"). -> Mêmes résultats avec 100 ou 10 ou 1 neuronnes, comment ça se fait ?
+Mauvaises performances car retourne toujours le plus fréquent ("3"). -> Mêmes résultats 
+avec 100 ou 10 ou 1 neuronnes, comment ça se fait ?
 Docs TF, LSTM, ...
 Discussion RE -> Caractères 1 par 1 ? fenetre glissante y compris au début
 tentatives utilisation du cluster, encore des problèmes, TF 1.5 trop en avance sur CUDA ?
 
 Mardi 13 Février : 8h00 - 12h 13h - 17h
-SA me montre cluster (effectivement problème de version TF + d'autres), divers docs, nouveau parseur
-Avec nouveau parseur efficace environ 40% sur couches taille 10, c'est mieux ! vrai réponses et pas juste la plus probable
-En ajustant un peu longueur de fenetre et nb de neuronnes, on obtient jusqu'à 80%, mais on retrouve un peu le "biais de bourrage"
+SA me montre cluster (effectivement problème de version TF + d'autres), divers docs, 
+nouveau parseur
+Avec nouveau parseur efficace environ 40% sur couches taille 10, c'est mieux ! vrai 
+réponses et pas juste la plus probable
+En ajustant un peu longueur de fenetre et nb de neuronnes, on obtient jusqu'à 80%, mais on 
+retrouve un peu le "biais de bourrage"
 fenetres multiples et bourrage partout pour compenser, tests en cours.
 Lancement sur cluster (asfalda1), ça va moins vite que local !?! La faute a PV ?
 
 Mercredi 14 Février : 9h30 - 12h40 13h40 - 18h30
 Mini réunion SA et RE, je continue les expérimentations spice
 Local plus rapide que adnvideo1 !
-Entrées en argument, on lance toutes les taches sur clusters a la fois, il faudra décortiquer
+Entrées en argument, on lance toutes les taches sur clusters a la fois, il faudra 
+décortiquer
 décortiquage : bon pas mauvais mais pas top non plus, voir papiers
 Lectures très bonnes docs collah sur LSTM et RNN et autres
-Lectures docs Keras sur embedding, padding -> il le fait vraisemblablement mieux que moi, a tester
-Je lance sur le cluster pour la nuit les memes trucs mais avec les données 1. Wall sera suffisant ?
+Lectures docs Keras sur embedding, padding -> il le fait vraisemblablement mieux que moi, 
+a tester
+Je lance sur le cluster pour la nuit les memes trucs mais avec les données 1. Wall sera 
+suffisant ?
 
 Jeudi 15 Février : 10h - 13h 14h - 18h30
-6 sur 18 ont terminé cette nuit, Wall trop court pour les autres, ils sont décevants : apprentissage du plus fréquent
-Pas la peine de relancer les autres, si il faut attendre deux heures, autant étudier la couche mbed
-nouveau parseur pour aller avec l'embedding, mise en git car ça devient chiant a gérer tout en scp
-ça marche mieux avec embed+parse3, je lance des travaux sur le cluster avant le repas, on décortique après manger
-Après manger toujours pas fini, en fait j'avais relancé sur le jeu 1, mais celui-ci est trop gros, donc j'ai relancé sur jeu 0, en attendant je fais de l'algèbre et j'attaque les articles sur WFA
-Toujours pas fini en fin d'aprem, décidement beaucoup plus long, j'ai mis a cuire pour la nuit on verra demain
+6 sur 18 ont terminé cette nuit, Wall trop court pour les autres, ils sont décevants : 
+apprentissage du plus fréquent
+Pas la peine de relancer les autres, si il faut attendre deux heures, autant étudier la 
+couche mbed
+nouveau parseur pour aller avec l'embedding, mise en git car ça devient chiant a gérer 
+tout en scp
+ça marche mieux avec embed+parse3, je lance des travaux sur le cluster avant le repas, on 
+décortique après manger
+Après manger toujours pas fini, en fait j'avais relancé sur le jeu 1, mais celui-ci est 
+trop gros, donc j'ai relancé sur jeu 0, en attendant je fais de l'algèbre et j'attaque les 
+articles sur WFA
+Toujours pas fini en fin d'aprem, décidement beaucoup plus long, j'ai mis a cuire pour la 
+nuit on verra demain
 
 Vendredi 16 Février : 8h30 - 12h30
-Ce matin certains ont fini, d'autres sont encore en cours, ils ont commencé plus tard, on va extraire ce qu'on a pour commencer. ça finit a peu près au fur et a mesure
+Ce matin certains ont fini, d'autres sont encore en cours, ils ont commencé plus tard, on 
+va extraire ce qu'on a pour commencer. ça finit a peu près au fur et a mesure
 Les résultats sont globalement meilleurs, et en tout cas plus eq.
 Réunion du Vendredi
 Début doc SciKit Learn et SP2 Learn
@@ -71,38 +87,174 @@ Début doc SciKit Learn et SP2 Learn
 --> S2 : 8+8+8+7.5+4 = 35.5
 
 Lundi 19 Février : 8h - 12h10 13h10 - 17h
-J'ai épluché les résultats sur les données 6 : plutôt bien, s'améliore toujours avec plus de neuronnes
-Faut-il faire une expérience avec beaucoup de neuronnes ? peut être temps de passer à autre chose,
+J'ai épluché les résultats sur les données 6 : plutôt bien, s'améliore toujours avec plus 
+de neuronnes
+Faut-il faire une expérience avec beaucoup de neuronnes ? peut être temps de passer à 
+autre chose,
 Je vais essayer de me consacrer au spectral cette semaine.
 Réunion SA et RE : faire la métrique spéciale dans spicetest, continuer lecture spectrale
-Bon la métrique ça marchera probablement pas a cause de la mise en désordre, mais on pourra évaluer à posteriori
+Bon la métrique ça marchera probablement pas a cause de la mise en désordre, mais on 
+pourra évaluer à posteriori
 Relance des expériences sur données 8 et avec fenetre "maximale"
 
 Mardi 20 Février : 8h30 - 13h15 13h15 - 17h30
-Certains n'ont pas fini, et ils risquent de déborder le walltime, merde. Il y en a un, je sais pas lequel qui est à 12h/epoch environ
+Certains n'ont pas fini, et ils risquent de déborder le walltime, merde. Il y en a un, je 
+sais pas lequel qui est à 12h/epoch environ
 On va essayer d'extraire le reste pour commencer.
-Du coup finalement j'ai pas encore attaqué a extraire, mais j'ai préparé la métrique, on peut la mesurer a posteriori
+Du coup finalement j'ai pas encore attaqué a extraire, mais j'ai préparé la métrique, on 
+peut la mesurer a posteriori
 ça a pas été très facile, adaptation Python2/3, bug bête de ma part, best_n, ...
-J4ai aussi mis en place une sauvegarde du modele après chaque epoch, ça évitera les incidents malheureux de manque de walltime a pas grand chose
+Le train commence par écrire son nom dans la sortie, ça permet d'identifier les 
+retardataires.
+J'ai aussi mis en place une sauvegarde du modele après chaque epoch, ça évitera les 
+incidents malheureux de manque de walltime a pas grand chose
+Je relance des expériences avec d'autres données et toutes les améliorations mentionnées 
+ci-dessus. Ensuite un peu de spectral
 
-Mercredi 21 Février :
-Jeudi 22 Février : Conférence St-Charles
-Vendredi 23 Février :
+Mercredi 21 Février : 8h - 11h40 12h40 - 17h
+Toutes les expériences sauf (-1, 400) sont terminées, j'observe les résultats : on dépasse 
+plusieurs fois la référence (Shibata modèle LSTM) !
+J'attends la dernière pour comparer avec les modèles les plus proches possibles (il y a 
+quelques diff cependant).
+Aprem spectrale et algèbre. Décomposition au rang : quel est le critère d'arrêt du pivot 
+de gauss ?
+Réunion avec SA et RE : On rentre dans le vif du sujet, cf photo.
+
+Jeudi 22 Février : Conférences St-Charles
+
+Vendredi 23 Février : 9h - 12h30
+Mail RE sur l'avis de Benoit Favre, je lis les docs
+installation un peu bordélique de splearn.
+Réunion du vendredi.
+
+--> S4 : 8+8+8+(8)+3,5 = 35,5 
+
+Lundi 26 Février : 9h30 - 11h30 12h30 - 18h30
+(Aujourd'hui pas de chauffage, au début ça va mais en fin de journée on commence a se 
+cailler un peu le cul)
+A l'attaque sur le spectral !
+Je jette un oeil sur comment c'est fait dedans.
+Un petit détour python POO / décorateurs pour mieux comprendre.
+On commence les manips pour générer tous les mots de la bonne longueur et ainsi de suite...
+Repas avec Coline, putain le crous est fermé.
+Je fais le "RNN to Hankel", mais j'ai un doute sur comment le brancher avec Spectral -> 
+retour a l'inspection du code -> retour a la POO Python.
+RE me parle d'un article avec les memes objectifs mais une methode différente qui date de 
+2012
+Ok ça va mieux en python, il faudra réattaquer demain
 
 
-Lundi 26 Février :
-Mardi 27 Février :
-Mercredi 28 Février :
-Jeudi 1 Mars :
-Vendredi 2 Mars :
+Mardi 27 Février : ~8h
+A la maison
+(Putain j'ai cassé Ubuntu avec un écran HDMI)
+Etude du fonctionnement de Spectral.fit() et ramifications...
+(Le soir je réinstalle une 17.10, c'est cool !)
 
-Lundi 5 Mars :
-Mardi 6 Mars :
-Mercredi 7 Mars :
-Jeudi 8 Mars :
-Vendredi 9 Mars :
+Mercredi 28 Février : ~8h
+J'essaye de faire mon (9 piece luggage set) custom fit
+Bon ok ça a l'air de pas trop mal marcher, j'entraine un model sur un exemple pas trop gros
+pautomac train 4, on verra ce que ça donnera.
 
-Lundi 12 Mars :
+Jeudi 1 Mars : ~7h
+On lance les premières expériences sur le truc, ça marche pas top, c'est peut etre car 
+petit rang, lrows, lcolw ...
+
+Vendredi 2 Mars : ~4h
+J'essaye d'accélérer un peu les choses, sur petits params ça marche pas, sur gros ça finit 
+pas...
+Je lance des grosses fournées pour le WE, on verra lundi
+
+--> S5 : 35
+
+Lundi 5 Mars : 9h30 - 11h30 12h30 - 18h00
+Les expériences n'ont pas fini, c'est la merde.
+Réunion avec RE : il faut juger du succès ou de l'échec avec la perplexité, pas a l'oeil.
+Mise en place du calcul de perplexité autour de l'extraction de l'automate ...
+Premières expériences : le RNN est absolument nul (1200 de perp contre 80 attendu) et 
+l'automate extrait encore pire (19237 de perp...). Grosse variabilité de la perp avec 
+epsilon (jusqu'à 2m) ?
+En pratique le problème est que epsilon est utilisé 834/1000 fois, donc l'automate est 
+moisi, dégénéré, parce que le RNN est dégénéré...
+A faire expériences : plus d'épochs, padding à la fin, ... cf kw "language modelling"
+Expériences en cours : avec beaucoup d'epoches, classification binaire et normale, sample 
+15k.
+On a pas encore toutes les epochs mais les premiers modèles donnent des résultats aussi 
+nuls que d'habitude...
+Dernière minute : RE suspecte un mauvais usage de la prédiction par le RNN, ce qu'o nveut 
+c'est le produit des probabilités de tous les suffixes sachant les précédents, et pas 
+seulement du symbole de fin sachant que le mot entier est son préfixe ! Objectif de 
+demain !
+
+Mardi 6 Mars : 9h - 18h (ns yerba)
+Je met en place le nouveau calcul de la probabilité d'un mot, RE avait raison, le RNN a 
+maintenant une perplexité tout a fait acceptable de 87 pour 80 sur pautomac 4, par contre l'automate 
+extrait est toujours à la ramasse, il utilise epsilon dans 80% des cas. Est-ce car on 
+utilise petit lrows et lcols ? expériences en cours...
+J'en profite pour entrainer un nouveau RNN avec de petites evolutions, petits bugs 
+résolus, et sur un autre jeu de données : 5 ...
+Au passage je fais une course CPU contre GPU sur le cluster, car je suspecte un problème 
+avec les GPUs trop lents ? 
+Il semblerait effectivement que le train aille plus vite sur CPU que GPU ! comment est-ce 
+possible ? Et en plus sans compilation optimisée pour AVX, ...
+Du coup j'essaye de compiler tensorflow pour AVX sur machine locale
+La compilation maison de TF a fonctionné, ça va plus vite en effet, j'essaye maintenant de 
+compiler pour les E5-2650 Sandybridge du cluster, mais depuis ma machine locale car
+je ne peux pas installer bazel sur le cluster.
+Complications inattendues : il faut build pour python3.4, qui n'est pas sur ub17.10, donc
+il faut bidouiller ça prend du temps.
+Entre temps j'implémente kl divergence en plus de la perplexité dans hank.py
+C'est un peu le bordel avec mes venvs sur le cluster, il faut que je range tout ça
+Tentatives de parallélisations de la génération des mots pour aller plus vite, malheureusement
+il y a la difficulté du set, sinon les trucs pas uniques vont tuer le temps que prends le model.
+En fait le set ça se passe très bien, on fait aussi les probas en un GROS batch et ça va mieux,
+la vitesse est vraiment meilleure, on va pouvoir faire des tests assez gros.
+
+Mercredi 7 Mars : 10h - 18h (ns)
+Je passe la matinée a mettre de l'ordre dans les venvs sur le cluster et a essayer de compiler TF
+pour les cpus du clusters. Malheureusement plein de problèmes de version de gcc, libcpp, ...
+Je fais quelques essais en local pour hank.py mais même après quelques réglages, on a des problèmes
+d'échelle : impossible de le faire marcher avec des taille qui laisse une chance de fonctionner.
+Je repars à l'attaque de la compilation de TF cette fois en compilant Bazel sur le cluster, pour
+pouvoir faire la compilation de TF de là bas (adnvideo1).
+Ok compilation de Bazel longue mais ça a l'air bon
+J'ai pu lancer compilatio nde TF CPU, un peu long, on verra.
+A part ça, à partir de 3 ou 4 epochs, la perplexité du modèle augmente fortement : surapprentissage?
+J'ai essayé de comprendre pourquoi on a autant de zéros, c'est un arrondi, qui se produit encore
+plus fréquement sur les longs mots, forcément.
+
+Jeudi 8 Mars : 10h - 18h (ns)
+J'arrive en retard car j'ai perdu ma carté de métro. En arrivant je suis déçu de voir que ni la
+compilation de TF ni l'expérience avec gros lrows et lcols sur le jeu 5 n'ont fonctionnées.
+Je n'ai pas d'autre choix que de relancer (pour la compilation cette fois il semble se passer
+vraiment quelquechose, ok).
+Cette fois la compilation a réussi, en 10 minutes, je ne sais pas ce qu'il s'est passé hier soir...
+Du coup ça y est on a un environnent performant pour mener des expériences a grande échelle !
+Ok après expérience, le CPU semble plus rapide pour l'entrainement du modèle, mais pour l'extraction
+GPU fait un peu mieux.
+Je continue le travail sur l'accélération de hank.py : trops de doublons soumis au rnn, paralléli-
+sons l'encodage-prefixage-padding des mots a évaluer.
+Mini réunion SA : pointe problèmes de RNN, suggère de vérifier en croisant loss, perp, sur des
+pautomacs pour vérifier que ce ne soit pas un problème de RNN inadapté.
+Un réorganisation du code me semble nécéssaire à la lumière de mes progrès en Python.
+Les travaux sur proba_words sont bons ! sur pautomac5, 200 neuronnes, 3 3 on passe d'un grosse heure
+à 7 minutes. ça laisse espérer de pouvoir monter à 4 4, je lance l'expérience, a relancer demain
+matin pour le weekend eventuellement.
+Après j'améliore test selon les conseils de SA, voir test2.py
+Je lance l'expérience sur test2.py, données paut6
+
+Vendredi 9 Mars : 9h45 - 12h
+Observations des résultats des expériences.
+
+--> S5 : (7.5)+9+8+8+(2.25) = 34.75
+
+Lundi 12 Mars : 8h30 -
+Je décortique un peu les résultats des expériences, quelques mauvaises nouvelles :
+ - Les apprentissages (hors ceux tués pour libérer des GPUs) même avec 96h ne finiront pas, mais on
+a quand même une quinzaine d'epochs sur 20.
+ - L'extraction d'automate est morte aussi, je pense que c'est pas manque de RAM, à creuser pour
+éviter ce problème.
+Donc on a toujours un problème d'échelle pour la spectralisation, plus a cause du temps mais à cause
+de l'espace. A creuser...
 Mardi 13 Mars :
 Mercredi 14 Mars :
 Jeudi 15 Mars :
@@ -159,12 +311,12 @@ Vendredi 11 Mai :
 Lundi 14 Mai :
 Mardi 15 Mai :
 Mercredi 16 Mai :
-Jeudi 17 Mai :
-Vendredi 18 Mai :
+Jeudi 17 Mai : GT?
+Vendredi 18 Mai : GT
 
 Lundi 21 Mai : PENTECOTE
-Mardi 22 Mai :
-Mercredi 23 Mai :
+Mardi 22 Mai : GT
+Mercredi 23 Mai : GT?
 Jeudi 24 Mai :
 Vendredi 25 Mai :
 

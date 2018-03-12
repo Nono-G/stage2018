@@ -1,0 +1,16 @@
+-1 data/pautomac/6.pautomac.train 50 20 32 100000 t2 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 100 20 32 100000 t2 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 200 20 32 100000 t2 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 400 20 32 100000 t2 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+8 data/pautomac/6.pautomac.train 50 20 32 100000 w8 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+8 data/pautomac/6.pautomac.train 100 20 32 100000 w8 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+8 data/pautomac/6.pautomac.train 200 20 32 100000 w8 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+8 data/pautomac/6.pautomac.train 400 20 32 100000 w8 data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 50 20 32 50000 psample data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 100 20 32 50000 psample data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 200 20 32 50000 psample data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 400 20 32 50000 psample data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 1
+-1 data/pautomac/6.pautomac.train 50 20 32 100000 gru data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 3
+-1 data/pautomac/6.pautomac.train 100 20 32 100000 gru data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 3
+-1 data/pautomac/6.pautomac.train 200 20 32 100000 gru data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 3
+-1 data/pautomac/6.pautomac.train 400 20 32 100000 gru data/pautomac/6.pautomac.test data/pautomac/6.pautomac_solution.txt 3

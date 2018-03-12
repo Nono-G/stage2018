@@ -1,6 +1,6 @@
 import keras
 import parse3 as parse
-import score as sc
+import scores as sc
 import sys
 import numpy as np
 # extra imports to set GPU options
@@ -34,8 +34,8 @@ def prec_seq(y_test, pred):
             print(str(x)+":", str(occ_faux[x])+"/"+str(faux), "->", occ_faux[x]/faux, sep="\t")
 
 
-if len(sys.argv) != 5:
-    sys.exit("ARGS : wid prefixes model targets")
+if len(sys.argv) != 4:
+    sys.exit("ARGS : model prefixes targets")
 
 ###################################
 # TensorFlow wizardry
@@ -53,22 +53,25 @@ k.tensorflow_backend.set_session(tf.Session(config=config))
 
 # windows_widths = [int(s) for s in sys.argv[1].split()]
 # pad_width = int(sys.argv[2])
-wid = int(sys.argv[1])
-test_file = sys.argv[2]
-model_file = sys.argv[3]
-targets_file = sys.argv[4]
 
+model_file = sys.argv[1]
+test_file = sys.argv[2]
+targets_file = sys.argv[3]
+
+model = keras.models.load_model(model_file)
+
+# wid = int(sys.argv[1])
+wid = int(model.input.shape[1])
 # a, x_test, y_test = parse.parse_train(test_file, wid)
 a, x_test = parse.parse_test_prefixes(test_file, wid)
 y_test = parse.parse_targets(targets_file, a)
 # print(x_test)
 print(x_test.shape)
-model = keras.models.load_model(model_file)
 # scores = model.evaluate(x_test, y_test)
 # print(scores)
 pred = model.predict(x_test, len(x_test))
 pred = np.array([parse.best_n_args(aaa, 5) for aaa in pred])
-s = sc.calc_score(pred, targets_file)
+s = sc.spice_score(pred, targets_file)
 print(s)
 
 # with open("ret", "w") as fret:

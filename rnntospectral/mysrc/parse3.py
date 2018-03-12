@@ -1,14 +1,14 @@
 import numpy as np
 
 
-def parse_train(filename, wid=-1):
+def parse_train(filename, wid=-1, padbefore=True):
     xs = []
     ys = []
     maxlen = 0
     with open(filename, 'r') as file:
         nsamples, nalpha = [int(a) for a in file.readline().split()]
         for line in file.readlines():
-            ll, (xl, yl) = parse_line(line, nalpha, wid)
+            ll, (xl, yl) = parse_line(line, nalpha, wid, padbefore)
             xs += xl
             ys += yl
             if ll > maxlen:
@@ -17,7 +17,7 @@ def parse_train(filename, wid=-1):
     ys = [onehot(a-1, nalpha+2) for a in ys]
     # On finit le padding jusqu'a maxlen :
     if wid == -1:
-        xs = [pad_0(a, maxlen+1) for a in xs]
+        xs = [pad_0(a, maxlen+1, padbefore) for a in xs]
     return nalpha, np.array(xs), np.array(ys)
 
 
@@ -51,7 +51,7 @@ def parse_targets(targets_file, nalpha):
     return np.array(targ)
 
 
-def parse_line(line, nalpha, widarg):
+def parse_line(line, nalpha, widarg, padbefore=True):
     # on ajoute 1 partout pour que le zero soit libre pour servir de bourrage :
     sp = line.split()
     linelen = int(sp[0])
@@ -60,22 +60,28 @@ def parse_line(line, nalpha, widarg):
     else:
         wid = widarg
     seq = [nalpha+1]+[int(a)+1 for a in sp[1:]]+[nalpha+2]
-    return linelen, windows(seq, wid)
+    return linelen, windows(seq, wid, padbefore)
 
 
-def pad_0(seq, size):
-    return pad(seq, 0, size)
+def pad_0(seq, size, before=True):
+    return pad(seq, 0, size, before)
 
 
-def pad(seq, elt, size):
-    return [elt]*(size-len(seq)) + seq
+def pad(seq, elt, size, before=True):
+    if len(seq) < size:
+        if before:
+            return [elt]*(size - len(seq)) + seq
+        else:
+            return seq + [elt]*(size-len(seq))
+    else:
+        return seq[-size:]
 
 
-def windows(seq, wid):
+def windows(seq, wid, padbefore=True):
     xs = []
     ys = seq[1:]
     for i in range(1, min(wid, len(seq))):
-        xs += [pad_0(seq[:i], wid)]
+        xs += [pad_0(seq[:i], wid, padbefore)]
         # ys += [seq[i]]
     for i in range(0, len(seq)-wid):
         xs += [seq[i:i+wid]]
@@ -101,6 +107,56 @@ def argmax(x):
 
 def best_n_args(seq, n):
     return np.argsort(seq)[::-1][:n]
+
+
+def parse_pautomac_results(filename, epsilon=0.000001):
+    with open(filename, "r") as file:
+        n = int(file.readline())
+        y = np.empty(n)
+        for i in range(n):
+            y[i] = float(file.readline())
+            if y[i] == 0:
+                y[i] = epsilon
+    return y
+
+
+def parse_fullwords(filename):
+    with open(filename, "r") as file:
+        spl = file.readline().split()
+        nbx = int(spl[0])
+        # nalpha = int(spl[1])
+        x = []
+        for i in range(nbx):
+            x.append([int(s) for s in file.readline().split()[1:]])
+    return x
+
+
+def parse_fullwords_encoded(filename, padsize):
+    with open(filename, "r") as file:
+        spl = file.readline().split()
+        nbx = int(spl[0])
+        nalpha = int(spl[1])
+        x = []
+        for i in range(nbx):
+            x.append(pad_0([nalpha+1]+[int(s)+1 for s in file.readline().split()[1:]]+[nalpha+2], padsize))
+    return np.array(x)
+
+
+def to_binary_classf(y, one):
+    biny = np.empty((y.shape[0], 2))
+    for i in range(len(y)):
+        if argmax(y[i]) == one:
+            biny[i] = np.array([0, 1])
+        else:
+            biny[i] = np.array([1, 0])
+    return biny
+
+
+def random_sample(x, y, nb):
+    shufflek = np.random.choice(x.shape[0], nb, replace=False)
+    x_ret = x[shufflek, :]
+    y_ret = y[shufflek, :]
+    return x_ret, y_ret
 
 
 if __name__ == "__main__":
