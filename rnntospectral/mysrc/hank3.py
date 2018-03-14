@@ -3,7 +3,6 @@ import sys
 import threading
 import numpy as np
 import keras
-import time
 # Maison :
 import parse3 as parse
 import scores
@@ -64,15 +63,16 @@ class ParaBatch(threading.Thread):
 
 
 class ParaWords(threading.Thread):
-    def __init__(self, prefixes, suffixes, letter, subthreads=1, print_id=-1):
+    def __init__(self, prefixes, suffixes, letter, hush, subthreads=1, print_id=-1):
         threading.Thread.__init__(self)
         self.prefixes = prefixes
         self.suffixes = suffixes
         self.letter = letter
         self.words = set()
         self.subthreads = subthreads
-        self.quiet = False
+        self.quiet = True
         self.id = print_id
+        self.h = hush
 
     def run(self):
         ws = set()
@@ -82,7 +82,7 @@ class ParaWords(threading.Thread):
             thrs = []
             prefparts = parts_of_list(self.prefixes, self.subthreads)
             for i in range(self.subthreads):
-                th = ParaWords(prefparts[i], self.suffixes, self.letter, 1, i)
+                th = ParaWords(prefparts[i], self.suffixes, self.letter, self.h, 1, i)
                 thrs.append(th)
                 th.start()
             for th in thrs:
@@ -94,11 +94,55 @@ class ParaWords(threading.Thread):
             pr(self.quiet, "\t\t\tThread letter {0}, part {1} begin".format(self.letter, self.id))
             for p in self.prefixes:
                 for s in self.suffixes:
-                    w = tuple(p + self.letter + s)
+                    w = self.h.encode(p + self.letter + s)
                     ws.add(w)
             pr(self.quiet, "\t\t\tThread letter {0}, part {1} end".format(self.letter, self.id))
         # Anyway :
         self.words = ws
+
+
+class Hush:
+    def __init__(self, maxlen, base):
+        self.maxlen = maxlen
+        self.base = base
+        self.nl = []
+        self.pows = []
+        self.mise_en_place()
+        self.maxval = self.encode([base - 1] * maxlen)
+
+    def mise_en_place(self):
+        self.pows = [1] * (self.maxlen+1)
+        for i in range(1, self.maxlen+1):
+            self.pows[i] = self.pows[i-1] * self.base
+        #
+        self.nl = [1] * (self.maxlen+1)
+        for i in range(1, self.maxlen+1):
+            self.nl[i] = self.nl[i-1] + (self.pows[i])
+        #
+
+    def encode(self, w):
+        if len(w) > self.maxlen:
+            raise ValueError
+        if len(w) == 0:
+            return 0
+        else:
+            x = self.nl[len(w)-1]
+            for i in range(len(w)):
+                x += w[i]*self.pows[len(w)-i-1]
+            return x
+
+    def decode(self, n):
+        if n > self.maxval:
+            raise ValueError
+        le = 0
+        while self.nl[le] <= n:
+            le += 1
+        x = [0]*le
+        reste = n - self.nl[le-1]
+        for i in range(le):
+            x[le-i-1] = reste % self.base
+            reste //= self.base
+        return x
 
 
 def gen_words(nalpha, lrows, lcols):
@@ -112,8 +156,9 @@ def gen_words(nalpha, lrows, lcols):
             raise TypeError()
         else:
             lcols = [i for i in range(lcols + 1)]
-    lig, col, wl = gen_words_indexes_as_lists_para(nalpha, lrows, lcols)
-    return lig, col, wl
+    hush = Hush(1+max(lrows)+max(lcols), nalpha)
+    lig, col, wl = gen_words_indexes_as_lists_para(nalpha, lrows, lcols, hush)
+    return hush, lig, col, wl
 
 
 def pr(quiet=False, m=""):
@@ -122,7 +167,7 @@ def pr(quiet=False, m=""):
         sys.stdout.flush()
 
 
-def gen_words_indexes_as_lists_para(nalpha, lrows, lcols, quiet=False):
+def gen_words_indexes_as_lists_para(nalpha, lrows, lcols, hush, quiet=False):
     lig = []
     col = []
     thrs = []
@@ -156,25 +201,24 @@ def gen_words_indexes_as_lists_para(nalpha, lrows, lcols, quiet=False):
     pr(quiet, "\tConstruction des mots...")
     nlig = len(lig)
     ncol = len(col)
-    wl = set()
+    encoded_words_set = set()
     letters = [[]]+[[i] for i in range(nalpha)]
     thrs = []
     for letter in letters:
-        th = ParaWords(lig, col, letter, 4)
+        th = ParaWords(lig, col, letter, hush, 4)
         thrs.append(th)
         th.start()
     for th in thrs:
         th.join()
-        wl = wl.union(th.words)
+        encoded_words_set = encoded_words_set.union(th.words)
     # for letter in letters:
     #     for l in range(0, nlig):
     #         # w.append([])
     #         for c in range(0, ncol):
     #             w = lig[l] + letter + col[c]
-    #             # if w not in wl:
-    #             wl.add(tuple(w))
-    wl = [list(elt) for elt in wl]
-    return lig, col, wl
+    #             # if w not in encoded_words_set:
+    #             encoded_words_set.add(tuple(w))
+    return lig, col, list(encoded_words_set)
 
 
 def combinaisons(nalpha, dim):
@@ -346,61 +390,117 @@ def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
         return preds
 
 
-def hankels(ligs, cols, probas, nalpha):
-    nligs = len(ligs)
-    ncols = len(cols)
-    lhankels = [np.zeros((nligs, ncols)) for _ in range(nalpha+1)]
-    # EPSILON :
-    for l in range(nligs):
-        for c in range(ncols):
-            lhankels[0][l][c] = probas[tuple(ligs[l]+cols[c])]
-    # LETTER MATRICES :
-    letters = [i for i in range(nalpha)]
-    for letter in letters:
-        for l in range(nligs):
-            for c in range(ncols):
-                lhankels[letter+1][l][c] = probas[tuple(ligs[l] + [letter] + cols[c])]
+def gen_batch(word_list, nalpha, pad, h, batch_vol=1):
+    current_v = 0
+    batch = []
+    for wcode in word_list:
+        w = h.decode(wcode)
+        w = [nalpha+1]+[elt+1 for elt in w]+[nalpha+2]
+        w = parse.pad_0(w, (len(w)+pad-1))
+        for i in range(len(w) - pad):
+            batch.append(w[i:i + pad])
+        current_v += 1
+        if current_v == batch_vol:
+            current_v = 0
+            ret = np.array(batch)
+            batch = []
+            yield ret
+    yield np.array(batch)
+
+
+def gen_batch_simple(word_list, nalpha, pad, h, batch_vol=1):
+    current_v = 0
+    batch = []
+    for wcode in word_list:
+        w = h.decode(wcode)
+        w = [nalpha + 1] + [elt + 1 for elt in w]
+        w = parse.pad_0(w, pad)
+        batch.append(w)
+        current_v += 1
+        if current_v == batch_vol:
+            current_v = 0
+            ret = np.array(batch)
+            batch = []
+            yield ret
+    yield np.array(batch)
+
+
+def proba_words_g(model, x_words, nalpha, hush, asdict=True, quiet=False):
+    pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
+    suffs_batch = set()
+    pr(quiet, "\tMise en batch des prefixes...")
+    # for wcode in x_words:
+    #     w = hush.decode(wcode)
+    #     for i in range(len(w)+1):
+    #         suffs_batch.add(hush.encode(w[:i]))
+    # suffs_batch = list(suffs_batch)
+    suffs_batch = x_words  # Seulement car lrows et lcols sont "pleins" 
+    # ################
+    pr(quiet, "\tUtilisation du RNN...")
+    batch_vol = 512
+    steps = math.ceil(len(suffs_batch)/batch_vol)
+    g = gen_batch_simple(suffs_batch, nalpha, pad, hush, batch_vol)
+    suffs_preds = model.predict_generator(g, steps, verbose=(0 if quiet else 1))
+    suffs_dict = {}
+    for k in range(len(suffs_batch)):
+        suffs_dict[suffs_batch[k]] = suffs_preds[k]
+    del suffs_preds
+    del suffs_batch
+    pr(quiet, "\tCalcul de la probabilite des mots entiers...")
+    preds = np.empty(len(x_words))
+    for i in range(len(x_words)):
+        word = hush.decode(x_words[i])+[nalpha+1]
+        acc = 1.0
+        for k in range(len(word)):
+            acc *= suffs_dict[hush.encode(word[:k])][word[k]]
+        preds[i] = acc
+    del suffs_dict
+    if asdict:  # On retourne un dictionnaire
+        probas = dict()
+        for i in range(len(x_words)):
+            probas[x_words[i]] = preds[i]
+        return probas
+    else:  # On retourne une liste
+        return preds
+
+
+def hankels(ligs, cols, probas, nalpha, hush):
+    lhankels = [np.zeros((len(ligs), len(cols))) for _ in range(nalpha+1)]
+    # EPSILON AND LETTER MATRICES :
+    letters = [[]] + [[i] for i in range(nalpha)]
+    for letter in range(len(letters)):
+        for l in range(len(ligs)):
+            for c in range(len(cols)):
+                # lhankels[letter][l][c] = probas[tuple(ligs[l] + [letter] + cols[c])]
+                lhankels[letter][l][c] = probas[hush.encode(ligs[l] + letters[letter] + cols[c])]
     return lhankels
 
 
 def custom_fit(rank, lrows, lcols, modelfile, perplexity=False, train_file="", target_file=""):
     model = keras.models.load_model(modelfile)
     nalpha = int(model.output.shape[1])-2
-    # nalpha = 4
-    # train_file = "/home/nono/stage2018/rnntospectral/data/pautomac/4.pautomac.test"
-    # target_file = "/home/nono/stage2018/rnntospectral/data/pautomac/4.pautomac_solution.txt"
     ###
     # Params :
     quiet = False
-    partial = False
+    partial = True
     # Préparations :
-    if not quiet:
-        print("Construction of set of words...")
-        sys.stdout.flush()
-    ligs, cols, lw = gen_words(nalpha, lrows, lcols)
-    if not quiet:
-        print("Prediction of probabilities of words...")
-        sys.stdout.flush()
-    probas = proba_words_para(model, lw, nalpha)
-    if not quiet:
-        print("Building of hankel matrices...")
-        sys.stdout.flush()
-    lhankels = hankels(ligs, cols, probas, nalpha)
+    pr(quiet, "Construction of set of words...")
+    hush, ligs, cols, lw = gen_words(nalpha, lrows, lcols)
+    pr(quiet, "Prediction of probabilities of words...")
+    probas = proba_words_g(model, lw, nalpha, hush)
+    pr(quiet, "Building of hankel matrices...")
+    lhankels = hankels(ligs, cols, probas, nalpha, hush)
     spectral_estimator = sp.Spectral(rank=rank, lrows=lrows, lcolumns=lcols,
                                      version='classic', partial=partial, sparse=False,
                                      smooth_method='none', mode_quiet=quiet)
     # Les doigts dans la prise !
-    if not quiet:
-        print("Custom fit ...")
-        sys.stdout.flush()
+    pr(quiet, "Custom fit ...")
     spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=lrows, lcolumns=lcols,
                                            version='classic', partial=partial, sparse=False,
                                            mode_quiet=quiet, lhankel=lhankels)
     spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, quiet)
     # OK on a du a peu près rattraper l'état après fit.
-    if not quiet:
-        print("... Done !")
-        sys.stdout.flush()
+    pr(quiet, "... Done !")
     # Perplexity :
     if perplexity:
         print("Perplexity :")
@@ -481,89 +581,3 @@ if __name__ == "__main__":
 
     est = custom_fit(arg_rank, arg_lrows, arg_lcols, arg_model, arg_perp, arg_testfile, arg_testtargetsfile)
     sp.Automaton.write(est.automaton, filename=("aut-"+context))
-
-
-# VIELLES CHOSES ::
-
-
-# Listes des mots, sans parrallélisation
-# def words_indexes_as_lists(nalpha, lrows, lcols):
-#     lig = []
-#     col = []
-#     for d in lrows:
-#         lig += combinaisons(nalpha, d).tolist()
-#     for d in lcols:
-#         col += combinaisons(nalpha, d).tolist()
-#     # On trie pour faire comme dans hankel.py mais je comprends pas trop pourquoi
-#     col = sorted(col, key=lambda x: (len(x), x))
-#     lig = sorted(lig, key=lambda x: (len(x), x))
-#     # ###
-#     nlig = len(lig)
-#     ncol = len(col)
-#     wl = []
-#     letters = [[]]+[[i] for i in range(nalpha)]
-#     for letter in letters:
-#         for l in range(0, nlig):
-#             # w.append([])
-#             for c in range(0, ncol):
-#                 w = lig[l] + letter + col[c]
-#                 if w not in wl:
-#                     wl.append(w)
-#     return lig, col, wl
-
-
-# def comb3(a, r, p, nalpha):
-#     for i in range(0, len(a)):
-#         a[i][r] = (i // p) % nalpha
-
-    # # Calcul de la probabilité des mots :
-    # preds = np.empty(len(words))
-    # offset = 0
-    # if not quiet:
-    #     print("\tCalculating fullwords probas OK")
-    #     sys.stdout.flush()
-    # for i in range(len(words)):
-    #     word = batch_words[i]
-    #     acc = 1.0
-    #     for k in range(len(word)-1):
-    #         acc *= wpreds[offset][word[k+1]-1]
-    #         offset += 1
-    #     preds[i] = acc
-    #     # if not quiet:
-    #     #     print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, len(batch_words)), end="")
-    # # if not quiet:
-    # #     print("\r\tCalculating fullwords probas OK                         ")
-    # #     sys.stdout.flush()
-
-# def proba_words_para2(model, x_words, nalpha, asdict=True, quiet=False):
-#     pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
-#     preds = np.empty(len(x_words))
-#     # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
-#     # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
-#     batch_words = [([nalpha+1]+[1+elt2 for elt2 in elt]+[nalpha+2])for elt in x_words]
-#     nbw = len(x_words)
-#     for i in range(nbw):
-#         word = batch_words[i]
-#         # prefixes :
-#         batch = [word[:j] for j in range(1, len(word))]
-#         # padding :
-#         batch = [parse.pad_0(elt, pad) for elt in batch]
-#         # On restructure tout en numpy
-#         batch = np.array(batch)
-#         # Prédiction :
-#         wpreds = model.predict(batch, len(batch))
-#         acc = 1.0
-#         for k in range(len(word)-1):
-#             acc *= wpreds[k][word[k+1]-1]
-#         preds[i] = acc
-#         if not quiet:
-#             print("\r{0} / {1}".format(i, nbw), end="")
-#     if not quiet:
-#         print("")
-#     if asdict:  # On retourne un dictionnaire
-#         probas = dict()
-#         for i in range(len(x_words)):
-#             probas[tuple(x_words[i])] = preds[i]
-#         return probas
-#     else:  # On retourne une liste
-#         return preds

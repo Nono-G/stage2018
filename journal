@@ -247,16 +247,57 @@ Observations des résultats des expériences.
 
 --> S5 : (7.5)+9+8+8+(2.25) = 34.75
 
-Lundi 12 Mars : 8h30 -
+Lundi 12 Mars : 8h30 - 11h30 12h - 17h
 Je décortique un peu les résultats des expériences, quelques mauvaises nouvelles :
  - Les apprentissages (hors ceux tués pour libérer des GPUs) même avec 96h ne finiront pas, mais on
 a quand même une quinzaine d'epochs sur 20.
- - L'extraction d'automate est morte aussi, je pense que c'est pas manque de RAM, à creuser pour
+ - L'extraction d'automate est morte aussi, je pense que c'est par manque de RAM, à creuser pour
 éviter ce problème.
-Donc on a toujours un problème d'échelle pour la spectralisation, plus a cause du temps mais à cause
-de l'espace. A creuser...
-Mardi 13 Mars :
-Mercredi 14 Mars :
+Par de petits calculs, problèmes confirmés : donc on a toujours un problème d'échelle pour la
+spectralisation, plus a cause du temps mais à cause de l'espace. A creuser...
+Donc : petite amélioration pour pas faire les mêmes calculs pours lig et col si ils ont des dims en
+commun, del des trucs qui serviront plus (mieux que le ramasse-miettes ?), Encore un peu plus de par
+allélisation, mais ça ne résoud pas les questions d'espace... faut-il passer a un générateur ?
+Après études et réflexions, un générateur réduira fortement la contrainte d'espace, j'espère que
+ça ne pèsera pas trop sur la contrainte de temps (moins de parallélisme a priori, sauf si TF/Keras
+sont des génies et que predict_generator les tire au fur et a mesure du generator, auquel cas ce
+sera masqué par le temps de prédiction, ce qui serait génial) et aussi que ça suffira à résoudre le
+problème d'espace.
+
+Mardi 13 Mars : 8h-12h 13h-19h40
+Coupure electrique aujd 12-13h30 ça m'arrange pas du tout, travail AM maison ?
+Hank2 avec générateurs fonctionne maintenant, il reste a tester. ça a été l'occasion de découvrir un
+gros bug dans hankel (remplissage des matrices : la epsilon était écrassée par la 1, la dernière
+jamais remplie (décalage de 1) oups !), ça élimine tous les zéros qui était remplacés par epsilon,
+par contre du coup il y a une moitié de négatifs !
+Ce qui est censé multithreader sur le générateur ne marche pas, les args pas picklable ? Bizarre.
+Problème de mise en désordre ? Apparament bug connu de Keras mais ils s'en foutent. Certains
+suggère de faire à la main en utilisant train_on_batch, mais ça me semble compliqué comme parrallé-
+lisation, surtout en rapport avec problème suivant :
+Autre gros problème, impossible d'instancier plusieurs modèles à partir d'un même fichier on dirait.
+Du coup impossible de paralléliser sur l'alphabet. 
+A midi je rentre a la maison pour continuer a bosser, a cause de la coupure d'électricité.
+Test de hank2 (avec generator) : Beacoup plus lent (x 2*nalpha)
+On peut palier un peu ça en faisant des batchs de batchs =)
+Malheureusement, à cause du retour des redondances dans les données a évaluer, un 5 5 devrait avoir
+un temps de traitement d'environ 2 mois...
+Du coup hank3 hybride des deux j'espère, plutôt rapide, codage/decodage d'un mot en un entier pour
+ménager la RAM. Ça à l'air de marcher, je lance cette nuit avec 5 5, on verra demain.
+A faire : un mode "rapide" avec raccourcis car lrows et lcols sont égaux et "plein" ?
+Je finis tard pour pas lacher l'inspiration sur hank3
+
+Mercredi 14 Mars : 8h - 11h45 12h45 - 17h
+Hank3 est lui aussi mystérieusement mort. Manque de mémoire ? bizarre car en interactif ça marchait,
+Moins de mémoire en sub qu'en interactif ? En fait en interactif ça a pas remarché (see4c1)
+Je vais essayer de faire un hank3 "express" qui tient compte du fait qu'on utilise toujours tous les
+mots jusqu'à n.
+hank4express.py est né ! Je le teste avec lrows=lcols=5: 300 heures pour l'évaluation des mots
+... pénible mais c'est peut-être le prix a payer...
+En fait en faisant des gros batch (1000~2000) on tombe a 150 heures, raisonnablement enviseageable.
+Voyons si le GRU est plus rapide ? : Non Gru pas plus rapide, environ 140 heures, avec 50 neuronnes
+seulement, par contre plus docile ? ou c'est grace a pautomac6 ? > (15 4) donne des résultats
+sympas : (66.98, 69.52, 76.83), KL RNN-EXTR = 0.0232. Point positif, la performance semble croitre
+avec lrows-lcols (diminution du nombre de négatifs par ailleurs), qui donne de l'espoir pour (15 5)
 Jeudi 15 Mars :
 Vendredi 16 Mars :
 
