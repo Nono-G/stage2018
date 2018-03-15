@@ -63,14 +63,14 @@ class ParaBatch(threading.Thread):
 
 
 class ParaWords(threading.Thread):
-    def __init__(self, prefixes, suffixes, letter, hush, subthreads=1, print_id=-1):
+    def __init__(self, prefixes, suffixes, letter, hush, subthreads=1, print_id=-1, quiet=True):
         threading.Thread.__init__(self)
         self.prefixes = prefixes
         self.suffixes = suffixes
         self.letter = letter
         self.words = set()
         self.subthreads = subthreads
-        self.quiet = True
+        self.quiet = quiet
         self.id = print_id
         self.h = hush
 
@@ -193,31 +193,30 @@ def gen_words_indexes_as_lists_para(nalpha, lrows, lcols, hush, quiet=False):
     del thrs
     del dims
     del dimdict
-    # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
     pr(quiet, "\tTri lignes et colonnes...")
+    # Y'a pas la place pour tout le monde :
+    # coeff = hush.nl[3] / len(col)
+    coeff = 1.0
+    shufflek = np.random.choice(len(col), int(len(col)*coeff), replace=False)
+    col = [col[i] for i in shufflek]
+    # coeff = hush.nl[3] / len(lig)
+    shufflek = np.random.choice(len(lig), int(len(lig)*coeff), replace=False)
+    lig = [lig[i] for i in shufflek]
+    # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
     col = sorted(col, key=lambda x: (len(x), x))
     lig = sorted(lig, key=lambda x: (len(x), x))
     # ###
     pr(quiet, "\tConstruction des mots...")
-    nlig = len(lig)
-    ncol = len(col)
     encoded_words_set = set()
     letters = [[]]+[[i] for i in range(nalpha)]
     thrs = []
     for letter in letters:
-        th = ParaWords(lig, col, letter, hush, 4)
+        th = ParaWords(lig, col, letter, hush, 2, quiet=quiet)
         thrs.append(th)
         th.start()
     for th in thrs:
         th.join()
         encoded_words_set = encoded_words_set.union(th.words)
-    # for letter in letters:
-    #     for l in range(0, nlig):
-    #         # w.append([])
-    #         for c in range(0, ncol):
-    #             w = lig[l] + letter + col[c]
-    #             # if w not in encoded_words_set:
-    #             encoded_words_set.add(tuple(w))
     return lig, col, list(encoded_words_set)
 
 
@@ -314,11 +313,11 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
         word = tuple([x for x in words[i]])+(nalpha+1,)
         acc = 1.0
         for k in range(len(word)):
+            pref = word[:k][-pad:]
             try:
-                pref = word[:k][-pad:]
                 proba = prefixes_dict[pref][word[k]]
                 acc *= proba
-            except :
+            except KeyError:
                 print("gabuzomeu !", pref)
         preds[i] = acc
         # if not quiet:
@@ -429,12 +428,11 @@ def proba_words_g(model, x_words, nalpha, hush, asdict=True, quiet=False):
     pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
     suffs_batch = set()
     pr(quiet, "\tMise en batch des prefixes...")
-    # for wcode in x_words:
-    #     w = hush.decode(wcode)
-    #     for i in range(len(w)+1):
-    #         suffs_batch.add(hush.encode(w[:i]))
-    # suffs_batch = list(suffs_batch)
-    suffs_batch = x_words  # Seulement car lrows et lcols sont "pleins" 
+    for wcode in x_words:
+        w = hush.decode(wcode)
+        for i in range(len(w)+1):
+            suffs_batch.add(hush.encode(w[:i]))
+    suffs_batch = list(suffs_batch)
     # ################
     pr(quiet, "\tUtilisation du RNN...")
     batch_vol = 512
@@ -476,13 +474,13 @@ def hankels(ligs, cols, probas, nalpha, hush):
     return lhankels
 
 
-def custom_fit(rank, lrows, lcols, modelfile, perplexity=False, train_file="", target_file=""):
+def custom_fit(ranks, lrows, lcols, modelfile, perplexity=False, train_file="", target_file="", context=""):
     model = keras.models.load_model(modelfile)
     nalpha = int(model.output.shape[1])-2
     ###
     # Params :
     quiet = False
-    partial = True
+    epsilon = 0.0001
     # Préparations :
     pr(quiet, "Construction of set of words...")
     hush, ligs, cols, lw = gen_words(nalpha, lrows, lcols)
@@ -490,43 +488,55 @@ def custom_fit(rank, lrows, lcols, modelfile, perplexity=False, train_file="", t
     probas = proba_words_g(model, lw, nalpha, hush)
     pr(quiet, "Building of hankel matrices...")
     lhankels = hankels(ligs, cols, probas, nalpha, hush)
-    spectral_estimator = sp.Spectral(rank=rank, lrows=lrows, lcolumns=lcols,
-                                     version='classic', partial=partial, sparse=False,
-                                     smooth_method='none', mode_quiet=quiet)
-    # Les doigts dans la prise !
-    pr(quiet, "Custom fit ...")
-    spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=lrows, lcolumns=lcols,
-                                           version='classic', partial=partial, sparse=False,
-                                           mode_quiet=quiet, lhankel=lhankels)
-    spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, quiet)
-    # OK on a du a peu près rattraper l'état après fit.
-    pr(quiet, "... Done !")
-    # Perplexity :
     if perplexity:
-        print("Perplexity :")
-        epsilon = 0.0001
-
+        pr(quiet, "Perplexity preparations...")
         x_test = parse.parse_fullwords(train_file)
         x_test_sp = spparse.load_data_sample(train_file)
         y_test = parse.parse_pautomac_results(target_file)
 
         perp_proba_rnn = fix_probas(proba_words_para(model, x_test, nalpha, asdict=False, quiet=False), f=epsilon)
-        perp_proba_spec = fix_probas(spectral_estimator.predict(x_test_sp.data), f=epsilon)
-        print(countlen(x_test, lrows+lcols+1))
         test_perp = scores.pautomac_perplexity(y_test, y_test)
         rnn_perp = scores.pautomac_perplexity(y_test, perp_proba_rnn)
-        extract_perp = scores.pautomac_perplexity(y_test, perp_proba_spec)
-
         test_rnn_kl = scores.kullback_leibler(y_test, perp_proba_rnn)
-        rnn_extr_kl = scores.kullback_leibler(perp_proba_rnn, perp_proba_spec)
-        test_extr_kl = scores.kullback_leibler(y_test, perp_proba_spec)
+    else:
+        x_test_sp = None
+        y_test = None
+        rnn_perp = None
+        perp_proba_rnn = None
+        test_perp = None
+        test_rnn_kl = None
+    spectral_estimator = None
+    for rank in ranks:
+        if len(ranks) > 1:
+            pr(quiet, "Rank {0} among {1} :".format(rank, ranks))
+        # noinspection PyTypeChecker
+        spectral_estimator = sp.Spectral(rank=rank, lrows=ligs, lcolumns=cols,
+                                         version='classic', partial=True, sparse=False,
+                                         smooth_method='none', mode_quiet=quiet)
+        # Les doigts dans la prise !
+        pr(quiet, "Custom fit ...")
+        spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=ligs, lcolumns=cols,
+                                               version='classic', partial=True, sparse=False,
+                                               mode_quiet=quiet, lhankel=lhankels)
+        # noinspection PyProtectedMember
+        spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, quiet)
+        # OK on a du a peu près rattraper l'état après fit.
+        pr(quiet, "... Done !")
+        # Perplexity :
+        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(context, rank)))
+        if perplexity:
+            print("Perplexity :")
+            perp_proba_spec = fix_probas(spectral_estimator.predict(x_test_sp.data), f=epsilon)
+            extract_perp = scores.pautomac_perplexity(y_test, perp_proba_spec)
+            rnn_extr_kl = scores.kullback_leibler(perp_proba_rnn, perp_proba_spec)
+            test_extr_kl = scores.kullback_leibler(y_test, perp_proba_spec)
 
-        print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
-              .format(test_perp, rnn_perp, extract_perp))
-        print("KL Divergence :")
-        print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
-              .format(test_rnn_kl, rnn_extr_kl, test_extr_kl))
-    #
+            print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
+                  .format(test_perp, rnn_perp, extract_perp))
+            print("KL Divergence :")
+            print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
+                  .format(test_rnn_kl, rnn_extr_kl, test_extr_kl))
+        #
     return spectral_estimator
 
 
@@ -555,13 +565,15 @@ def countlen(seq, le):
 
 if __name__ == "__main__":
     if len(sys.argv) < 5 or len(sys.argv) > 7:
-        print("Usage :: {0} modelfile rank lrows lcols [testfile testtargetsfile]".format(sys.argv[0]))
+        print("Usage :: {0} modelfile ranks lrows lcols [testfile testtargetsfile]".format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
-    context = (sys.argv[1]+"!"+sys.argv[2]+"!"+sys.argv[3]+"!"+sys.argv[4]).replace(" ", "_").replace("/", "+")
-    print("Context :", context)
+    context_a = ((sys.argv[1] + "!" + sys.argv[2] + "!" + sys.argv[3] + "!" + sys.argv[4])
+                 .replace(" ", "_")
+                 .replace("/", "+"))
+    print("Context :", context_a)
     arg_model = sys.argv[1]
-    arg_rank = int(sys.argv[2])
+    arg_ranks = [int(e) for e in sys.argv[2].split(sep="_")]
     try:
         arg_lrows = int(sys.argv[3])
     except ValueError:
@@ -579,5 +591,7 @@ if __name__ == "__main__":
         arg_testtargetsfile = ""
         arg_perp = False
 
-    est = custom_fit(arg_rank, arg_lrows, arg_lcols, arg_model, arg_perp, arg_testfile, arg_testtargetsfile)
-    sp.Automaton.write(est.automaton, filename=("aut-"+context))
+    est = custom_fit(arg_ranks, arg_lrows, arg_lcols,
+                     arg_model, arg_perp, arg_testfile,
+                     arg_testtargetsfile, context_a)
+    # sp.Automaton.write(est.automaton, filename=("aut-"+context))

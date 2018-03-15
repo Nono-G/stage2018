@@ -3,7 +3,6 @@ import sys
 import threading
 import numpy as np
 import keras
-import time
 # Maison :
 import parse3 as parse
 import scores
@@ -53,6 +52,9 @@ class ParaBatch(threading.Thread):
         nbw = len(encoded_words)
         for i in range(nbw):
             word = encoded_words[i]
+            if len(word) > 10:
+                kr = 12 + 8 + 5
+                kr = kr/2
             # prefixes :
             batch += [word[:j] for j in range(1, len(word))]
         # padding :
@@ -259,7 +261,9 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
     for i in range(len(batch_prefixes_lists)):
         key = batch_prefixes_lists[i]
         #  Decodage :
-        key = tuple([elt-1 for elt in key if elt > 0][1:])
+        key = tuple([elt-1 for elt in key if elt > 0])
+        if key[0] == nalpha:
+            key = key[1:]
         prefixes_dict[key] = wpreds[i]
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
@@ -270,12 +274,9 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
         word = tuple([x for x in words[i]])+(nalpha+1,)
         acc = 1.0
         for k in range(len(word)):
-            try:
-                pref = word[:k][-pad:]
-                proba = prefixes_dict[pref][word[k]]
-                acc *= proba
-            except :
-                print("gabuzomeu !", pref)
+            pref = word[:k][-pad:]
+            proba = prefixes_dict[pref][word[k]]
+            acc *= proba
         preds[i] = acc
         # if not quiet:
         #     print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, len(batch_words)), end="")
@@ -412,7 +413,6 @@ def custom_fit(rank, lrows, lcols, modelfile, perplexity=False, train_file="", t
 
         perp_proba_rnn = fix_probas(proba_words_para(model, x_test, nalpha, asdict=False, quiet=False), f=epsilon)
         perp_proba_spec = fix_probas(spectral_estimator.predict(x_test_sp.data), f=epsilon)
-        print(countlen(x_test, lrows+lcols+1))
         test_perp = scores.pautomac_perplexity(y_test, y_test)
         rnn_perp = scores.pautomac_perplexity(y_test, perp_proba_rnn)
         extract_perp = scores.pautomac_perplexity(y_test, perp_proba_spec)
@@ -443,14 +443,6 @@ def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
     if not quiet:
         print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
     return seq
-
-
-def countlen(seq, le):
-    k = 0
-    for i in range(len(seq)):
-        if len(seq[i]) > le:
-            k += 1
-    return k
 
 
 if __name__ == "__main__":

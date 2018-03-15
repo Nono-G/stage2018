@@ -279,12 +279,12 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
         word = tuple([x for x in words[i]])+(nalpha+1,)
         acc = 1.0
         for k in range(len(word)):
+            pref = word[:k][-pad:]
             try:
-                pref = word[:k][-pad:]
                 proba = prefixes_dict[pref][word[k]]
                 acc *= proba
-            except :
-                print("gabuzomeu !", pref)
+            except ValueError:
+                print("Gabuzomeu ! ", pref)
         preds[i] = acc
         # if not quiet:
         #     print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, len(batch_words)), end="")
@@ -430,13 +430,14 @@ def hankels(ligs, cols, probas, nalpha, hush):
     return lhankels
 
 
-def custom_fit(rank, lrows_lcols, modelfile, perplexity=False, train_file="", target_file=""):
+def custom_fit(ranks, lrows_lcols, modelfile, perplexity=False, train_file="", target_file="", context=""):
     model = keras.models.load_model(modelfile)
     nalpha = int(model.output.shape[1])-2
     ###
     # Params :
     quiet = False
     partial = True
+    epsilon = 0.0001
     # Préparations :
     pr(quiet, "Construction of set of words...")
     hush, ligs, cols, lw = gen_words(nalpha, lrows_lcols)
@@ -444,42 +445,54 @@ def custom_fit(rank, lrows_lcols, modelfile, perplexity=False, train_file="", ta
     probas = proba_words_g(model, lw, nalpha, hush)
     pr(quiet, "Building of hankel matrices...")
     lhankels = hankels(ligs, cols, probas, nalpha, hush)
-    spectral_estimator = sp.Spectral(rank=rank, lrows=lrows_lcols, lcolumns=lrows_lcols,
-                                     version='classic', partial=partial, sparse=False,
-                                     smooth_method='none', mode_quiet=quiet)
-    # Les doigts dans la prise !
-    pr(quiet, "Custom fit ...")
-    spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=lrows_lcols, lcolumns=lrows_lcols,
-                                           version='classic', partial=partial, sparse=False,
-                                           mode_quiet=quiet, lhankel=lhankels)
-    spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, quiet)
-    # OK on a du a peu près rattraper l'état après fit.
-    pr(quiet, "... Done !")
-    # Perplexity :
     if perplexity:
-        print("Perplexity :")
-        epsilon = 0.0001
-
+        pr(quiet, "Perplexity preparations...")
         x_test = parse.parse_fullwords(train_file)
         x_test_sp = spparse.load_data_sample(train_file)
         y_test = parse.parse_pautomac_results(target_file)
 
         perp_proba_rnn = fix_probas(proba_words_para(model, x_test, nalpha, asdict=False, quiet=False), f=epsilon)
-        perp_proba_spec = fix_probas(spectral_estimator.predict(x_test_sp.data), f=epsilon)
         test_perp = scores.pautomac_perplexity(y_test, y_test)
         rnn_perp = scores.pautomac_perplexity(y_test, perp_proba_rnn)
-        extract_perp = scores.pautomac_perplexity(y_test, perp_proba_spec)
-
         test_rnn_kl = scores.kullback_leibler(y_test, perp_proba_rnn)
-        rnn_extr_kl = scores.kullback_leibler(perp_proba_rnn, perp_proba_spec)
-        test_extr_kl = scores.kullback_leibler(y_test, perp_proba_spec)
+    else:
+        x_test_sp = None
+        y_test = None
+        rnn_perp = None
+        perp_proba_rnn = None
+        test_perp = None
+        test_rnn_kl = None
+    spectral_estimator = None
+    for rank in ranks:
+        if len(ranks) > 1:
+            pr(quiet, "Rank {0} among {1} :".format(rank, ranks))
+        spectral_estimator = sp.Spectral(rank=rank, lrows=lrows_lcols, lcolumns=lrows_lcols,
+                                         version='classic', partial=partial, sparse=False,
+                                         smooth_method='none', mode_quiet=quiet)
+        # Les doigts dans la prise !
+        pr(quiet, "Custom fit ...")
+        spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=lrows_lcols, lcolumns=lrows_lcols,
+                                               version='classic', partial=partial, sparse=False,
+                                               mode_quiet=quiet, lhankel=lhankels)
+        # noinspection PyProtectedMember
+        spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, quiet)
+        # OK on a du a peu près rattraper l'état après fit.
+        pr(quiet, "... Done !")
+        # Perplexity :
+        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(context, rank)))
+        if perplexity:
+            print("Perplexity :")
+            perp_proba_spec = fix_probas(spectral_estimator.predict(x_test_sp.data), f=epsilon)
+            extract_perp = scores.pautomac_perplexity(y_test, perp_proba_spec)
+            rnn_extr_kl = scores.kullback_leibler(perp_proba_rnn, perp_proba_spec)
+            test_extr_kl = scores.kullback_leibler(y_test, perp_proba_spec)
 
-        print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
-              .format(test_perp, rnn_perp, extract_perp))
-        print("KL Divergence :")
-        print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
-              .format(test_rnn_kl, rnn_extr_kl, test_extr_kl))
-    #
+            print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
+                  .format(test_perp, rnn_perp, extract_perp))
+            print("KL Divergence :")
+            print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
+                  .format(test_rnn_kl, rnn_extr_kl, test_extr_kl))
+        #
     return spectral_estimator
 
 
@@ -508,14 +521,14 @@ def countlen(seq, le):
 
 if __name__ == "__main__":
     if len(sys.argv) < 4 or len(sys.argv) > 6:
-        print("Usage   : {0} modelfile rank lrows [testfile testtargetsfile]".format(sys.argv[0]))
-        print("Exemple : {0} modelRNN1.h5py 6 3 5.pautomac.test 5.pautomac_solutions.txt")
+        print("Usage   : {0} modelfile ranks lrows [testfile testtargetsfile]".format(sys.argv[0]))
+        print("Exemple : {0} modelRNN1.h5py 6_10_20 3 5.pautomac.test 5.pautomac_solutions.txt".format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
-    context = (sys.argv[1]+"R"+sys.argv[2]+"LIGCOLS"+sys.argv[3]).replace(" ", "_").replace("/", "+")
-    print("Context :", context)
+    context_a = (sys.argv[1] + "r" + sys.argv[2] + "l" + sys.argv[3]).replace(" ", "_").replace("/", "+")
+    print("Context :", context_a)
     arg_model = sys.argv[1]
-    arg_rank = int(sys.argv[2])
+    arg_ranks = [int(e) for e in sys.argv[2].split(sep="_")]
     arg_lrows_lcols = int(sys.argv[3])
     if len(sys.argv) >= 6:
         arg_testfile = sys.argv[4]
@@ -526,5 +539,5 @@ if __name__ == "__main__":
         arg_testtargetsfile = ""
         arg_perp = False
 
-    est = custom_fit(arg_rank, arg_lrows_lcols, arg_model, arg_perp, arg_testfile, arg_testtargetsfile)
-    sp.Automaton.write(est.automaton, filename=("aut-"+context))
+    est = custom_fit(arg_ranks, arg_lrows_lcols, arg_model, arg_perp, arg_testfile, arg_testtargetsfile, context_a)
+    # sp.Automaton.write(est.automaton, filename=("aut-"+context))

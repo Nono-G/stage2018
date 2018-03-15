@@ -271,7 +271,7 @@ def generator_batches(pref, suff, letter, nalpha, pad, sidefx, batch_vol=10):
             for i in range(len(w)-pad):
                 batch.append(w[i:i+pad])
             current_v += 1
-            if current_v == batch_vol :
+            if current_v == batch_vol:
                 current_v = 0
                 ret = np.array(batch)
                 batch = []

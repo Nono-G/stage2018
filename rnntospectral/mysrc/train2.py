@@ -42,18 +42,20 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
         print("Pautomac base perplexity : {0}"
               .format(scores.pautomac_perplexity(pautomac_sol, pautomac_sol)))
     losses = []
-    for i in range(epochs):
+    for i in range(1, epochs+1):
         h = model.fit(x_train, y_train, batch, 1)
         model.save(modelname + "-" + str(i))
         losses.append(h.history["loss"][0])
         if pautomac:
-            pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol, hank.proba_words_para(model, pautomac_test, nalpha, False, True)))
-    for i in range(epochs):
-        print("Loss at epoch {0} : {1}".format(i, losses[i]))
-        if pautomac:
-            print("Perplexity at epoch {0} : {1}"
-                  .format(i, pautomac_perp[i]))
-        sys.stdout.flush()
+            pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
+                                                            hank.proba_words_para(model, pautomac_test,
+                                                                                  nalpha, False, True)))
+        for e in range(i):
+            print("Loss at epoch {0} : {1}".format(e+1, losses[e]))
+            if pautomac:
+                print("Perplexity at epoch {0} : {1}"
+                      .format(e+1, pautomac_perp[e]))
+            sys.stdout.flush()
 
 
 def nono_layer(t, *args, **kwargs):
@@ -89,7 +91,7 @@ if __name__ == "__main__":
         pauttest_arg = sys.argv[8]
         pautsol_arg = sys.argv[9]
     else:
-        paut_arg=False
+        paut_arg = False
         pauttest_arg = None
         pautsol_arg = None
     if len(sys.argv) > 10:
