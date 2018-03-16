@@ -127,7 +127,7 @@ Mail RE sur l'avis de Benoit Favre, je lis les docs
 installation un peu bordélique de splearn.
 Réunion du vendredi.
 
---> S4 : 8+8+8+(8)+3,5 = 35,5 
+--> S3 : 8+8+8+(8)+3,5 = 35,5 
 
 Lundi 26 Février : 9h30 - 11h30 12h30 - 18h30
 (Aujourd'hui pas de chauffage, au début ça va mais en fin de journée on commence a se 
@@ -164,7 +164,7 @@ J'essaye d'accélérer un peu les choses, sur petits params ça marche pas, sur 
 pas...
 Je lance des grosses fournées pour le WE, on verra lundi
 
---> S5 : 35
+--> S4 : 35
 
 Lundi 5 Mars : 9h30 - 11h30 12h30 - 18h00
 Les expériences n'ont pas fini, c'est la merde.
@@ -180,7 +180,7 @@ Expériences en cours : avec beaucoup d'epoches, classification binaire et norma
 15k.
 On a pas encore toutes les epochs mais les premiers modèles donnent des résultats aussi 
 nuls que d'habitude...
-Dernière minute : RE suspecte un mauvais usage de la prédiction par le RNN, ce qu'o nveut 
+Dernière minute : RE suspecte un mauvais usage de la prédiction par le RNN, ce qu'on veut 
 c'est le produit des probabilités de tous les suffixes sachant les précédents, et pas 
 seulement du symbole de fin sachant que le mot entier est son préfixe ! Objectif de 
 demain !
@@ -217,7 +217,7 @@ d'échelle : impossible de le faire marcher avec des taille qui laisse une chanc
 Je repars à l'attaque de la compilation de TF cette fois en compilant Bazel sur le cluster, pour
 pouvoir faire la compilation de TF de là bas (adnvideo1).
 Ok compilation de Bazel longue mais ça a l'air bon
-J'ai pu lancer compilatio nde TF CPU, un peu long, on verra.
+J'ai pu lancer compilation de TF CPU, un peu long, on verra.
 A part ça, à partir de 3 ou 4 epochs, la perplexité du modèle augmente fortement : surapprentissage?
 J'ai essayé de comprendre pourquoi on a autant de zéros, c'est un arrondi, qui se produit encore
 plus fréquement sur les longs mots, forcément.
@@ -264,7 +264,7 @@ sont des génies et que predict_generator les tire au fur et a mesure du generat
 sera masqué par le temps de prédiction, ce qui serait génial) et aussi que ça suffira à résoudre le
 problème d'espace.
 
-Mardi 13 Mars : 8h-12h 13h-19h40
+Mardi 13 Mars : 8h-12h 13h-19h45
 Coupure electrique aujd 12-13h30 ça m'arrange pas du tout, travail AM maison ?
 Hank2 avec générateurs fonctionne maintenant, il reste a tester. ça a été l'occasion de découvrir un
 gros bug dans hankel (remplissage des matrices : la epsilon était écrassée par la 1, la dernière
@@ -286,10 +286,10 @@ ménager la RAM. Ça à l'air de marcher, je lance cette nuit avec 5 5, on verra
 A faire : un mode "rapide" avec raccourcis car lrows et lcols sont égaux et "plein" ?
 Je finis tard pour pas lacher l'inspiration sur hank3
 
-Mercredi 14 Mars : 8h - 11h45 12h45 - 17h
+Mercredi 14 Mars : 8h - 11h45 12h45 - 16h
 Hank3 est lui aussi mystérieusement mort. Manque de mémoire ? bizarre car en interactif ça marchait,
 Moins de mémoire en sub qu'en interactif ? En fait en interactif ça a pas remarché (see4c1)
-Je vais essayer de faire un hank3 "express" qui tient compte du fait qu'on utilise toujours tous les
+Je vais essayer de faire un hank4 "express" qui tient compte du fait qu'on utilise toujours tous les
 mots jusqu'à n.
 hank4express.py est né ! Je le teste avec lrows=lcols=5: 300 heures pour l'évaluation des mots
 ... pénible mais c'est peut-être le prix a payer...
@@ -298,8 +298,71 @@ Voyons si le GRU est plus rapide ? : Non Gru pas plus rapide, environ 140 heures
 seulement, par contre plus docile ? ou c'est grace a pautomac6 ? > (15 4) donne des résultats
 sympas : (66.98, 69.52, 76.83), KL RNN-EXTR = 0.0232. Point positif, la performance semble croitre
 avec lrows-lcols (diminution du nombre de négatifs par ailleurs), qui donne de l'espoir pour (15 5)
-Jeudi 15 Mars :
-Vendredi 16 Mars :
+En attendant les résultats sur (15 4) pour comparer, je regarde le résultat des nombreux apprentis-
+sages lancés vendredi. J'ai du en tuer certains pour libérer des GPUs, w8 a planté a cause d'un bug
+avec le sous-padding (pas traité à ce jour, car hank3 et hank4 est devenu la norme, se méfier), la 
+reférence n'a pas eu le temps d'aller au bout des 20 batchs (96h quand même !). Résultats :
+Loss et perplexity ne sont pas corrélés (mais c'était pas attendu qu'ils le soient), psample est bon
+en loss mais pas en perplexity, se méfier !
+Réunion SA et RE :
+C'est normal qu'il y ait des poids négatifs prédits par l'automate extrait, ça devrait diminuer en
+augmentant le rang et la taille des préfixes et suffixes, il sera difficile de descendre en dessous
+de 5~10% de négatifs.
+C'est (peut-être) normal que ça marche mieux sur pauto6 (DPFA) que pauto5 (HMM) en raison de leur na
+ture. (Je vais peut-être me cantonner a des exemples dociles pour avoir quelques résultats sympas)
+TODO :
+Essayer en variant fortement le rang, essayer en sélectionnant aléatoirement un certain nombre de 
+préfixes et suffixes, ça devrait être possible en adapdant légèrement hank3. RE doit me donner une 
+liste des problèmes pautomac les plus représentatifs d'après B. Balle. RE absent 1.5 semaines après
+
+Jeudi 15 Mars : 9h30 - 18h45 (ns yerba)
+Je modifie hank4 pour prendre une liste de rangs a considérer plutôt qu'un unique rang, ça permet de
+grouper les fastidieuses opérations de préparation, puis de faire le spectral avec plusieurs valeurs
+de rangs pour l'expérience.
+Résultat d'une petite expérience : il semblerait que plus on augmente le rang, plus proche est la
+perp, mais plus on a de negs (bizarre, contradictoire ?). (Même si on a largement dépassé le vrai
+rang).
+Je modifie hank3 pour faire un drop aléatoire sur ligs et cols, ça impacte assez fort sur les perfs
+pour une longueur fixée, a voir si ça se compense en prenant une longueur plus grande mais en
+abandonnant pour rapprocher du temps d'éxécution de hank4. C'est perf/temps qui compte. La mise en
+batch est assez douloureuse, mais ça pourrait se paralléliser comme dans hank2.
+Les résultats sont hyper mauvais dis-donc ! est-ce que j'applique une réduction trop brutale ? en un
+petit quart d'heure ça fait beaucoup moins bien que hank4 en 5 minutes !
+hank4 (25 3) en 5 minutes > 75.788, cible 68.621 (176 negs)
+hank3 (25 4 4) compréssé au même nombre que 3 (mais ça fait plus de préfixes unique donc long) en
+15 minutes environ > 1336.230, cible 68.621 (408 negs)
+J'ai essayé avec des valeurs de rangs variables, ça reste désespérément foireux ! et avec plus de
+longueur c'est aussi assez catastrophique.
+Y a-t-il un bug ? dans certains cas je récupère une KL négative, c'est impossible normalement !
+peut-être qu'a cause d'epsilon, on n'a pas une vraie dist de proba, donc les thms sur KL ne marchent
+pas.
+Expérience : paut6 perp réelle : 66.98, perp rnn : 68.62, taille  3 3,
+			 vrai rang : 19, rangs : 8 10 19 20 30 50 100 200
+Avec fausse réduction (coeff 1 1) : résultat 84 sur rang 8
+								    résultats ~75 +/- 1 sur rangs 10 ... 100
+								    résultat 1e+35 sur rang 200
+CONFIRMATION par hank4 (sans réduction, exacts mêmes résultats que hank3 avec réduction 1 1)
+Avec petite réduction (coeff 0.95 0.95) : a peu près idem (un peu mieux ?)jusqu'à rang 50 inclus, 
+										  n'importe quoi total pour 100 et 200
+Avec un petit coeff de réduction (95%), on a des résultats semblables a sans réduction jusqu'à rang
+50 (perp 74.49, visée 68.62), plus gros rang la perplexité explose (à 100 : 761m) ! Pourtant la KL
+continue de descendre ! on voit que nb de probas négatives, perplexité et div KL ne sont pas cor-	
+rélés. Alors qui croire ?
+Préparation de trains de models sur des problèmes représentatifs (en tout cas moi je les aime) avec
+les trois types de machines génératrices représentés et des petits alphabets. Exploration du HW du
+cluster pour savoir sur quels noeuds je peux lancer ou non (support AVX2 notamment)
+J'en profite pour débug le calcul de perplexité avec des sous-padding (voir ci-dessus) comme ça on
+pourra l'utiliser pour entrainer des modèles en surveillant leur perplexité.
+Problème : Entre hank 1, 2, 3, 4 trop de duplicatas partiellements maintenus, ça m'énerve. A la lu-
+mière de mes progrès en python, la façon dont est faite hank* ne me plait pas, je réorganise tout
+joliement avec des classes, des héritages, des surcharges... comme ça on aura le moins possible de
+code dupliqué partout qu'il faut corriger et recorriger. On inaugure les Spex (SpectralExtractors).
+
+Vendredi 16 Mars : 9h - 12h
+Encore un peu de structuration de hank en spex, lancement des apprentissages.
+Réunion du vendredi.
+
+--> S6 : 8+(10.75)+7+(9,25)+3 = 38
 
 Lundi 19 Mars :
 Mardi 20 Mars :
