@@ -1,10 +1,8 @@
 import keras
 import sys
-import numpy as np
 # Maison :
 import parse3 as parse
 import scores
-import hank
 import spextractor_common
 
 

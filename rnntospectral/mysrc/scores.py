@@ -9,7 +9,7 @@ def find_proba(letter, target):
 
 
 def spice_score(rankings, targets_file):
-    final_score = -666.0
+    final_score = -1000
     with open(targets_file, "r") as t:
         score = 0
         nb_prefixes = 0
@@ -23,6 +23,7 @@ def spice_score(rankings, targets_file):
             denominator = float(target[0])
             prefix_score = 0
             k = 1
+            seen = []
             for elmnt in rankings[i]:
                 if k == 1:
                     seen = [elmnt]

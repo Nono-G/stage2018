@@ -16,7 +16,7 @@ tensorflow
 tempenv
 scikit-splearn
 rnntospectral/splearn
-rnntospectral/mysrc/__pychache__/*.pyc
+rnntospectral/mysrc/__pychache__
 rnntospectral/mysrc/aut-*
 bazel*
 .idea

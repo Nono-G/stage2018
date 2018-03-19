@@ -100,127 +100,6 @@ class ParaWords(threading.Thread):
 
 
 # Autres classes :
-class Spex:
-    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", context=""):
-        self.quiet = False
-        self.epsilon = 0.0001
-
-        self.model = keras.models.load_model(modelfile)
-        self.nalpha = int(self.model.output.shape[1])-2
-        self.pad = int(self.model.input.shape[1])
-        self.lrows = lrows
-        self.lcols = lcols
-        self.perplexity_train = perp_train
-        self.perplexity_target = perp_targ
-        self.is_ready = False
-
-        self.prefixes = None
-        self.suffixes = None
-        self.words = None
-        self.words_probas = None
-        self.lhankels = None
-
-        self.context = context
-        self.x_test = None
-        self.perplexity = False
-        self.x_test_sp = None
-        self.y_test = None
-        self.rnn_perp = None
-        self.perp_proba_rnn = None
-        self.test_perp = None
-        self.test_rnn_kl = None
-
-    def ready(self):
-        if self.perplexity_train != "" and self.perplexity_target != "":
-            self.perplexity = True
-            pr(self.quiet, "Perplexity preparations...")
-            self.x_test = parse.parse_fullwords(self.perplexity_train)
-            self.x_test_sp = spparse.load_data_sample(self.perplexity_train)
-            self.y_test = parse.parse_pautomac_results(self.perplexity_target)
-
-            self.perp_proba_rnn = fix_probas(self.proba_words_stock(self.x_test, asdict=False), f=self.epsilon)
-            self.test_perp = scores.pautomac_perplexity(self.y_test, self.y_test)
-            self.rnn_perp = scores.pautomac_perplexity(self.y_test, self.perp_proba_rnn)
-            self.test_rnn_kl = scores.kullback_leibler(self.y_test, self.perp_proba_rnn)
-        else:
-            self.perplexity = False
-            self.x_test_sp = None
-            self.y_test = None
-            self.rnn_perp = None
-            self.perp_proba_rnn = None
-            self.test_perp = None
-            self.test_rnn_kl = None
-
-        pr(self.quiet, "Prefixes, suffixes, words, ...")
-        self.prefixes, self.suffixes, self.words = self.gen_words()
-        pr(self.quiet, "Prediction of probabilities of words...")
-        self.words_probas=self.proba_words_special(self.words, True)
-        pr(self.quiet, "Building of hankel matrices...")
-        self.lhankels = self.hankels()
-        self.is_ready = True
-
-    def extr(self, rank):
-        if not self.is_ready:
-            self.ready()
-        spectral_estimator = sp.Spectral(rank=rank, lrows=self.lrows, lcolumns=self.lrows,
-                                         version='classic', partial=True, sparse=False,
-                                         smooth_method='none', mode_quiet=self.quiet)
-        # Les doigts dans la prise !
-        pr(self.quiet, "Custom fit ...")
-        spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=self.lrows, lcolumns=self.lrows,
-                                               version='classic', partial=True, sparse=False,
-                                               mode_quiet=self.quiet, lhankel=self.lhankels)
-        # noinspection PyProtectedMember
-        spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
-        # OK on a du a peu près rattraper l'état après fit.
-        pr(self.quiet, "... Done !")
-        # Perplexity :
-        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
-        if self.perplexity:
-            print("Perplexity :")
-            perp_proba_spec = fix_probas(spectral_estimator.predict(self.x_test_sp.data), f=self.epsilon)
-            extract_perp = scores.pautomac_perplexity(self.y_test, perp_proba_spec)
-            rnn_extr_kl = scores.kullback_leibler(self.perp_proba_rnn, perp_proba_spec)
-            test_extr_kl = scores.kullback_leibler(self.y_test, perp_proba_spec)
-
-            print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
-                  .format(self.test_perp, self.rnn_perp, extract_perp))
-            print("KL Divergence :")
-            print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
-                  .format(self.test_rnn_kl, rnn_extr_kl, test_extr_kl))
-        #
-        return spectral_estimator
-
-    def hankels(self):
-        pass
-
-    def proba_words_stock(self, words, asdict=True):
-        return proba_words_para(self.model, words, self.nalpha, asdict, self.quiet)
-
-    def proba_words_special(self, words, asdict=True):
-        return self.proba_words_stock(words, asdict)
-
-    def gen_words(self):
-        return [], [], []
-
-
-# SpexHush correspond a Hank3 et Hank4, ceux qui utilisent Hush
-class SpexHush(Spex):
-    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", context=""):
-        Spex.__init__(self, modelfile, lrows, lcols, perp_train, perp_targ, context)
-        self.hush = Hush(lrows+lcols+1, self.nalpha)
-
-    def hankels(self):
-        lhankels = [np.zeros((len(self.prefixes), len(self.suffixes))) for _ in range(self.nalpha + 1)]
-        # EPSILON AND LETTER MATRICES :
-        letters = [[]] + [[i] for i in range(self.nalpha)]
-        for letter in range(len(letters)):
-            for l in range(len(self.prefixes)):
-                for c in range(len(self.suffixes)):
-                    lhankels[letter][l][c] = self.words_probas[self.hush.encode(self.prefixes[l] + letters[letter] + self.suffixes[c])]
-        return lhankels
-
-
 class Hush:
     def __init__(self, maxlen, base):
         self.maxlen = maxlen
@@ -265,18 +144,148 @@ class Hush:
         return x
 
 
-# Fonctions :
-def combinaisons(nalpha, dim):
-    s = math.pow(nalpha, dim)
-    a = [[0]*dim]*int(s)
-    a = np.array(a)
-    p = s
-    for i in range(0, dim):
-        p /= nalpha
-        comb4(a, i, p, nalpha)
-    return a
+class Spex:
+    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", context=""):
+        self.quiet = False
+        self.epsilon = 0.0001
+
+        self.model = keras.models.load_model(modelfile)
+        self.nalpha = int(self.model.output.shape[1])-2
+        self.pad = int(self.model.input.shape[1])
+        self.lrows = lrows
+        self.lcols = lcols
+        self.perplexity_train = perp_train
+        self.perplexity_target = perp_targ
+        self.is_ready = False
+
+        self.prefixes = None
+        self.suffixes = None
+        self.words = None
+        self.words_probas = None
+        self.lhankels = None
+
+        self.context = context
+        self.x_test = None
+        self.perplexity = False
+        self.x_test_sp = None
+        self.y_test = None
+        self.rnn_perp = None
+        self.perp_proba_rnn = None
+        self.test_perp = None
+        self.test_rnn_kl = None
+
+    def ready(self):
+        if self.perplexity_train != "" and self.perplexity_target != "":
+            self.perplexity = True
+            pr(self.quiet, "Perplexity preparations...")
+            self.x_test = parse.parse_fullwords(self.perplexity_train)
+            self.x_test_sp = spparse.load_data_sample(self.perplexity_train)
+            self.y_test = parse.parse_pautomac_results(self.perplexity_target)
+
+            self.perp_proba_rnn = fix_probas(self.proba_words_normal(self.x_test, asdict=False), f=self.epsilon)
+            self.test_perp = scores.pautomac_perplexity(self.y_test, self.y_test)
+            self.rnn_perp = scores.pautomac_perplexity(self.y_test, self.perp_proba_rnn)
+            self.test_rnn_kl = scores.kullback_leibler(self.y_test, self.perp_proba_rnn)
+        else:
+            self.perplexity = False
+            self.x_test_sp = None
+            self.y_test = None
+            self.rnn_perp = None
+            self.perp_proba_rnn = None
+            self.test_perp = None
+            self.test_rnn_kl = None
+
+        pr(self.quiet, "Prefixes, suffixes, words, ...")
+        self.prefixes, self.suffixes, self.words = self.gen_words()
+        pr(self.quiet, "Prediction of probabilities of words...")
+        self.words_probas = self.proba_words_special(self.words, True)
+        pr(self.quiet, "Building of hankel matrices...")
+        self.lhankels = self.hankels()
+        self.is_ready = True
+
+    def extr(self, rank):
+        if not self.is_ready:
+            self.ready()
+        spectral_estimator = sp.Spectral(rank=rank, lrows=self.lrows, lcolumns=self.lrows,
+                                         version='classic', partial=True, sparse=False,
+                                         smooth_method='none', mode_quiet=self.quiet)
+        # Les doigts dans la prise !
+        pr(self.quiet, "Custom fit ...")
+        spectral_estimator._hankel = sp.Hankel(sample_instance=None, lrows=self.lrows, lcolumns=self.lrows,
+                                               version='classic', partial=True, sparse=False,
+                                               mode_quiet=self.quiet, lhankel=self.lhankels)
+        # noinspection PyProtectedMember
+        spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
+        # OK on a du a peu près rattraper l'état après fit.
+        pr(self.quiet, "... Done !")
+        # Perplexity :
+        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
+        if self.perplexity:
+            print("Perplexity :")
+            perp_proba_spec = fix_probas(spectral_estimator.predict(self.x_test_sp.data), f=self.epsilon)
+            extract_perp = scores.pautomac_perplexity(self.y_test, perp_proba_spec)
+            rnn_extr_kl = scores.kullback_leibler(self.perp_proba_rnn, perp_proba_spec)
+            test_extr_kl = scores.kullback_leibler(self.y_test, perp_proba_spec)
+
+            print("\tTest :\t{0}\n\tRNN :\t{1}\n\tExtr :\t{2}"
+                  .format(self.test_perp, self.rnn_perp, extract_perp))
+            print("KL Divergence :")
+            print("\tTest-RNN :\t{0}\n\tRNN-Extr :\t{1}\n\tTest-Extr :\t{2}"
+                  .format(self.test_rnn_kl, rnn_extr_kl, test_extr_kl))
+        #
+        return spectral_estimator
+
+    def hankels(self):
+        return []
+
+    def proba_words_normal(self, words, asdict=True):
+        return proba_words_para(self.model, words, self.nalpha, asdict, self.quiet)
+
+    def proba_words_special(self, words, asdict=True):
+        return self.proba_words_normal(words, asdict)
+
+    def gen_words(self):
+        return [], [], []
 
 
+# SpexHush correspond a Hank3 et Hank4, ceux qui utilisent Hush
+class SpexHush(Spex):
+    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", context=""):
+        Spex.__init__(self, modelfile, lrows, lcols, perp_train, perp_targ, context)
+        self.hush = Hush(lrows+lcols+1, self.nalpha)
+
+    def hankels(self):
+        lhankels = [np.zeros((len(self.prefixes), len(self.suffixes))) for _ in range(self.nalpha + 1)]
+        # EPSILON AND LETTER MATRICES :
+        letters = [[]] + [[i] for i in range(self.nalpha)]
+        for letter in range(len(letters)):
+            for l in range(len(self.prefixes)):
+                for c in range(len(self.suffixes)):
+                    p = self.words_probas[self.hush.encode(self.prefixes[l] + letters[letter] + self.suffixes[c])]
+                    lhankels[letter][l][c] = p
+        return lhankels
+
+    def gen_batch_decoded(self, word_list, batch_vol=1):
+        current_v = 0
+        batch = []
+        for wcode in word_list:
+            w = self.hush.decode(wcode)
+            w = [self.nalpha + 1] + [elt + 1 for elt in w]
+            w = parse.pad_0(w, self.pad)
+            batch.append(w)
+            current_v += 1
+            if current_v == batch_vol:
+                current_v = 0
+                ret = np.array(batch)
+                batch = []
+                yield ret
+        if len(batch) > 0:
+            yield np.array(batch)
+
+
+# #######
+# Fonctions utiles :
+# #######
 def combinaisons_para(nalpha, dim):
     s = math.pow(nalpha, dim)
     a = [[0]*dim]*int(s)
@@ -294,7 +303,6 @@ def combinaisons_para(nalpha, dim):
     return a
 
 
-# Très légèrement plus rapide que comb3, c'est toujours mieux que rien.
 def comb4(a, r, p, nalpha):
     c = 0
     acc = 0
@@ -388,6 +396,35 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
         return preds
 
 
+def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
+    z = 0
+    n = 0
+    for i in range(len(seq)):
+        if seq[i] < p:
+            seq[i] = f
+            n += 1
+        elif seq[i] == p:
+            seq[i] = f
+            z += 1
+    if not quiet:
+        print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
+    return seq
+
+
+# #######
+# Fonctions Conservées pour historique :
+# #######
+def combinaisons(nalpha, dim):
+    s = math.pow(nalpha, dim)
+    a = [[0]*dim]*int(s)
+    a = np.array(a)
+    p = s
+    for i in range(0, dim):
+        p /= nalpha
+        comb4(a, i, p, nalpha)
+    return a
+
+
 def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
     bsize = 512
     pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
@@ -441,21 +478,6 @@ def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
         return probas
     else:  # On retourne une liste
         return preds
-
-
-def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
-    z = 0
-    n = 0
-    for i in range(len(seq)):
-        if seq[i] < p:
-            seq[i] = f
-            n += 1
-        elif seq[i] == p:
-            seq[i] = f
-            z += 1
-    if not quiet:
-        print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
-    return seq
 
 
 def countlen(seq, le):

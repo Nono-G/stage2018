@@ -2,7 +2,6 @@ import math
 import sys
 import numpy as np
 # Maison :
-import parse3 as parse
 from spextractor_common import ParaRowsCols, pr, SpexHush
 
 
@@ -37,30 +36,13 @@ class SpexExpress(SpexHush):
         pr(self.quiet, "\tConstruction des mots...")
         return lig_col, lig_col, range(self.hush.nl[2 * self.lrows + 1])
 
-    def gen_batch_express(self, word_list, batch_vol=1):
-        current_v = 0
-        batch = []
-        for wcode in word_list:
-            w = self.hush.decode(wcode)
-            w = [self.nalpha + 1] + [elt + 1 for elt in w]
-            w = parse.pad_0(w, self.pad)
-            batch.append(w)
-            current_v += 1
-            if current_v == batch_vol:
-                current_v = 0
-                ret = np.array(batch)
-                batch = []
-                yield ret
-        if len(batch) > 0:
-            yield np.array(batch)
-
     def proba_words_special(self, words, asdict=True):
         suffs_batch = words  # Seulement car lrows et lcols sont "pleins"
         # ################
         pr(self.quiet, "\tUtilisation du RNN...")
         batch_vol = 2048
         steps = math.ceil(len(suffs_batch) / batch_vol)
-        g = self.gen_batch_express(suffs_batch, batch_vol)
+        g = self.gen_batch_decoded(suffs_batch, batch_vol)
         suffs_preds = self.model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         pr(self.quiet, "\tCalcul de la probabilite des mots entiers...")
         preds = np.empty(len(words))
@@ -259,5 +241,3 @@ if __name__ == "__main__":
 #                   .format(test_rnn_kl, rnn_extr_kl, test_extr_kl))
 #         #
 #     return spectral_estimator
-
-

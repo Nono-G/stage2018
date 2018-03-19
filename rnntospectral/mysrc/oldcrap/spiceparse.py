@@ -8,7 +8,7 @@ def _parsetrain(filename):
         maxlen = 0
         for i in range(0, nsamples):
             line = file.readline().split()
-            l = [_oneHot(int(x), nalpha+2) for x in line[1:]] + [_oneHot(nalpha, nalpha+2)]
+            l = [_one_hot(int(x), nalpha + 2) for x in line[1:]] + [_one_hot(nalpha, nalpha + 2)]
             if int(line[0]) > maxlen:
                 maxlen = int(line[0])
             data.append(l)
@@ -16,7 +16,7 @@ def _parsetrain(filename):
 
 
 def _expand(seq, size, nalpha):
-    return seq+([_oneHot(nalpha+1, nalpha+2)]*(size-len(seq)+1))
+    return seq+([_one_hot(nalpha + 1, nalpha + 2)] * (size - len(seq) + 1))
 
 
 def _sub(seq, nalpha):
@@ -60,14 +60,14 @@ def parseTestNpa(filename, trainfilename):
         nalpha = int(summary.readline())
         maxlen = int(summary.readline())
     with open(filename, "r") as file:
-        l = [_oneHot(int(x), nalpha + 2) for x in file.readline().split()[1:]] + [_oneHot(nalpha, nalpha + 2)]
+        l = [_one_hot(int(x), nalpha + 2) for x in file.readline().split()[1:]] + [_one_hot(nalpha, nalpha + 2)]
         x, y = _sub(l, nalpha)
         x = [_expand(a, maxlen, nalpha) for a in x]
         # y = [_oneHot(a, nalpha+1) for a in y]
     return np.array(x), np.array(y)
 
 
-def _oneHot(i, size):
+def _one_hot(i, size):
     r = [0]*size
     r[i] = 1
     return r
@@ -84,16 +84,17 @@ def argmax(x):
 
 
 def softmax(seq):
-    return _oneHot(argmax(seq), len(seq))
+    return _one_hot(argmax(seq), len(seq))
 
 
 if __name__ == "__main__":
+    pass
     # x,y = parsenpa('00.spice')
     # print(x)
     # print(y)
     # data = np.array(data)
     # print(l)
     # print(data)
-    x, y = parseTestNpa('0.spice.public.test', 4, 15)
-    print(x)
-    print(y)
+    # x, y = parseTestNpa('0.spice.public.test', 4, 15)
+    # print(x)
+    # print(y)

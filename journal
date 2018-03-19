@@ -359,12 +359,36 @@ joliement avec des classes, des héritages, des surcharges... comme ça on aura 
 code dupliqué partout qu'il faut corriger et recorriger. On inaugure les Spex (SpectralExtractors).
 
 Vendredi 16 Mars : 9h - 12h
-Encore un peu de structuration de hank en spex, lancement des apprentissages.
+Encore un peu de structuration de hank en spex, lancement des apprentissages. Les apprentissages
+finissent rapidement. Commentaires RE et FD sur "hank3" : il faut que l'ensemble des préfixes et/ou
+(pas sûrs, a vérifier) des suffixes soit préfixe-clos (et/ou suffixe-clos). Donc ça explique que
+ma sélection purement aléatoire ne fonctionne pas car casse théorèmes spectraux. A refaire. Dans un
+premier temps, on pourrait faire un laché seulement sur les suffixes, ça devrait garder les préfixes
+préfixes-clos et donc marcher.
 Réunion du vendredi.
 
 --> S6 : 8+(10.75)+7+(9,25)+3 = 38
 
-Lundi 19 Mars :
+Lundi 19 Mars : 10h - 11h40 12h40 - 18h30
+Objectifs : Faut voir les résultats des apprentissages de vendredi, continuer la réforme du code
+pour obtenir un joli hank3, hank4, et les tester sur les modèles de vendredi.
+Rapide point avec RE, on fixe Rdv a 17h, ça devrait me laisser le temps de faire les objectifs.
+Les apprentissages de vendredi ont bien marché, mais certains auraient mérité 30 epochs de plus.
+Je relance pour en avoir le coeur net. Finalement c'est parfois mieux mais surtout très variable
+avec l'initialisation on dirait, je ne retrouve pas du tout les mêmes résultats entre le run avec 20
+epochs et les 20 premières épochs du run avec 50 epochs. Cependant 50 epochs c'est mérité, et on
+peut largement se le permettre en terme de temps de calcul.
+A faire un de ces jours : ranger ma chambre sur le cluster, je crois que ça commence a être blindé.
+ça nous donne quelques beaux résultats bien tape à l'oeil =) ! :
+	- paut3  (maxgram, 50n, ep19, s20k) express, 4x4, r25 :
+		target : 49.95		rnn : 52.21		extr : 52.63		KL rnn-extr : 0.00063
+	- paut32  (8gram, 30n, ep35, s20k) express, 5x5, r50 :
+		target : 32.61		rnn : 34.91		extr : 35.45		KL rnn-extr : 0.00108
+	- paut28 (8gram, 30n, ep32, s20k) express, 4x4, r35:
+		target : 52.74		rnn : 53.60		extr : 53.96		KL rnn-extr : 0.00009
+Donc la technique marche ? On dirait que oui, reste l'interprétation visuelle de l'automate.
+D'ailleurs finalement ça marche même sur les HMM, et plutot bien.
+
 Mardi 20 Mars :
 Mercredi 21 Mars :
 Jeudi 22 Mars :
