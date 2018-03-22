@@ -50,7 +50,7 @@ def pautomac_perplexity(y, predict_prob):
     s = 0
     for i in range(len(y)):
         try:
-            s = s + y[i] / s_c * math.log(predict_prob[i] / s_a)
+            s += y[i]/s_c * math.log(predict_prob[i]/s_a)
         except ValueError:
             msg = "function loss or score use log " + \
                   "function values can't be" + \
@@ -62,7 +62,12 @@ def pautomac_perplexity(y, predict_prob):
 
 
 def kullback_leibler(y, predict_prob):
+    s_y = 1 # sum(y)
+    s_p = 1 # sum(predict_prob)
     kl = 0.0
     for i in range(len(y)):
-        kl += (y[i]*math.log((y[i]/predict_prob[i])))
+        if y[i] > 0:
+            p = y[i]/s_y
+            q = predict_prob[i]/s_p
+            kl += p*math.log(p/q)
     return kl

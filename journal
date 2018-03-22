@@ -157,7 +157,7 @@ pautomac train 4, on verra ce que ça donnera.
 
 Jeudi 1 Mars : ~7h
 On lance les premières expériences sur le truc, ça marche pas top, c'est peut etre car 
-petit rang, lrows, lcolw ...
+petit rang, lrows, lcols ...
 
 Vendredi 2 Mars : ~4h
 J'essaye d'accélérer un peu les choses, sur petits params ça marche pas, sur gros ça finit 
@@ -176,7 +176,7 @@ epsilon (jusqu'à 2m) ?
 En pratique le problème est que epsilon est utilisé 834/1000 fois, donc l'automate est 
 moisi, dégénéré, parce que le RNN est dégénéré...
 A faire expériences : plus d'épochs, padding à la fin, ... cf kw "language modelling"
-Expériences en cours : avec beaucoup d'epoches, classification binaire et normale, sample 
+Expériences en cours : avec beaucoup d'epochs, classification binaire et normale, sample 
 15k.
 On a pas encore toutes les epochs mais les premiers modèles donnent des résultats aussi 
 nuls que d'habitude...
@@ -388,10 +388,56 @@ A faire un de ces jours : ranger ma chambre sur le cluster, je crois que ça com
 		target : 52.74		rnn : 53.60		extr : 53.96		KL rnn-extr : 0.00009
 Donc la technique marche ? On dirait que oui, reste l'interprétation visuelle de l'automate.
 D'ailleurs finalement ça marche même sur les HMM, et plutot bien.
+Un peu de rangement du projet, qui en avait bien besoin, un peu de rangement sur cluster, mais le
+chantier est énorme, a reprendre plus tard. Hank3 et 4 sont de belles classes, les autres versions
+sont pour l'instant mises aux oubliettes.
+Réunion RE : 
+Globalement les résultats obtenus sont encourageants,
+Notre KL n'est pas vraiment une KL car pas sur la distribution entière mais seulement sur l'ens. de
+test, on pourrait faire plus rigoureux,
+2 branches de stage pour continuer le travail actuel. Il faudra faire un choix.
 
-Mardi 20 Mars :
-Mercredi 21 Mars :
-Jeudi 22 Mars :
+Concernant hank3, réduire seulement les suffixes ne fonctionne pas bien (perp ~300, pour une cible
+de ~30) a retravailler.
+
+Mardi 20 Mars : 10h30 - 11h40 12h40 - 18h (Jour de flemme)
+Je fait enfin un truc bien carré pour vérifier la p-closure dans hank3, ok ça marche, performances
+correctes (en terme de temps que ça prend de générer les préfixes) par contre ça donne pas des résu-
+ltats aussi bon que hank4 pour un temps imparti donné. résultats décents, dans le bon ordre de
+grandeur mais pas très pointus finalement. Quoique en choisissant bien les params, on arrive a des
+résultats intéréssants. Je fais quelques petites opti pour gagner du temps dans hank3 pour le tester
+plus.
+Je découvre que pour faire de la parrallélisation efficace sur le cluster, il faut réserver
+plusieurs coeurs ! (oarsub -l /core=2,walltime=4) Mais étrangement même en réservant plusieurs
+coeurs, les gains sont très limités, même en local.
+Erreur bizarre en essayant de charger un modèle Keras : apparament, les modèles enregistrés ne sont
+pas compatibles entre keras 2.1.4 et 2.1.5
+
+Mercredi 21 Mars : 8h - 18h30 (ns yerba) (il neige)
+Test "visuel" sur les automates extraits. J'en profite pour faire une course entre cluster-gpu et ma
+machine, c'est moi qui gagne a nouveau.
+Attention la visualisation peut etre assez longue a calculer (trouver un layout sans croisements ?)
+Il faut mettre du threshold sinon c'est illisible (graphe alphabet*complet).
+Le résultat est assez différent, mais peut-être est-ce équivalent ? difficile de juger à l'oeil.
+Il faut débiaiser KL div pour avoir une mesure objective de la ressemblance.
+Travaux sur le débiaisage assez importants, un tas de spaghetti, des noms de variables pas très 
+cohérents, etc.
+En passant RE donne pointeurs vers d'autres mesures : distance L2 entre automates, KL-symétrique 
+entre automate
+Ok, le débiaisage est fini, par contre sur des mots aléatoires, le model retourne une proba de 0
+dans 75% des cas, donc la valeur choisie pour epsilon dicte très fortement la KL sur rand, donc elle
+n'est pas pertinente... Ou alors peut-être que oui ? que non ? je suis perdu.
+En fait si P (la distribution de référence) contient des 0, c'est pas grave, c'est prévu par KL.
+C'est Q (la distribution approximant P) qui ne doit pas contenir de 0, ou alors P donne zéro aussi
+pour ce mot. Dans mon cas ça arrive parfois que Extr soit neg (donc 0, donc epsilon ?)
+Finalement il me semble que ça marche, et alors on aurait de très bon résultats dis-donc !
+Réunion RE : A voir WER, KL a l'envers, on arrive a se convaincre que les résultats ont du sens.
+
+Jeudi 22 Mars : 11h - 18h30 (ns yerba)
+Je me renseigne sur WER, mais dans B. Balle les détails sont maigres, et ailleurs ça veut dire autre
+chose. Je raffine un peu les mesures KL et Perp en indicant la proportion d'epsilon utilisée dans
+chaque calcul. c'est plus clair, plus net, ça permet de savoir quels nombres sont fiables ou trop
+dépendants d'epsilon.
 Vendredi 23 Mars :
 
 Lundi 26 Mars :
@@ -410,7 +456,7 @@ Lundi 9 Avril :
 Mardi 10 Avril :
 Mercredi 11 Avril :
 Jeudi 12 Avril :
-Vendredi 13 Avril :
+Vendredi 13 Avril : (sncf)
 
 Lundi 16 Avril :
 Mardi 17 Avril :
@@ -428,7 +474,7 @@ Lundi 30 Avril :
 Mardi 1 Mai : FETE DU TRAVAIL
 Mercredi 2 Mai :
 Jeudi 3 Mai :
-Vendredi 4 Mai :
+Vendredi 4 Mai : (sncf)
 
 Lundi 7 Mai :
 Mardi 8 Mai : ARMISTICE 45
@@ -440,7 +486,7 @@ Lundi 14 Mai :
 Mardi 15 Mai :
 Mercredi 16 Mai :
 Jeudi 17 Mai : GT?
-Vendredi 18 Mai : GT
+Vendredi 18 Mai : GT (sncf)
 
 Lundi 21 Mai : PENTECOTE
 Mardi 22 Mai : GT
@@ -456,21 +502,21 @@ Vendredi 1 Juin :
 
 Lundi 4 Juin :
 Mardi 5 Juin :
-Mercredi 6 Juin :
+Mercredi 6 Juin : RESUME RAPPORT
 Jeudi 7 Juin :
-Vendredi 8 Juin :
+Vendredi 8 Juin : (sncf)
 
-Lundi 11 Juin :
-Mardi 12 Juin :
+Lundi 11 Juin : RAPPORT DEFINITIF ?
+Mardi 12 Juin : RAPPORT DEFINITIF ?
 Mercredi 13 Juin :
 Jeudi 14 Juin :
 Vendredi 15 Juin :
 
 Lundi 18 Juin :
-Mardi 19 Juin :
+Mardi 19 Juin : SOUTENANCE
 Mercredi 20 Juin :
 Jeudi 21 Juin :
-Vendredi 22 Juin :
+Vendredi 22 Juin : (sncf)
 
 Lundi 25 Juin :
 Mardi 26 Juin :
