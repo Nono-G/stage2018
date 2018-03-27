@@ -5,6 +5,7 @@ import numpy as np
 from spextractor_common import ParaRowsCols, pr, SpexHush
 import splearn as sp
 
+
 class SpexExpress(SpexHush):
     """
     Spex "Express" : lrows=lcols = un entier, et tout est "plein" dans l'ensemble des mots
@@ -42,7 +43,7 @@ class SpexExpress(SpexHush):
         pr(self.quiet, "\tUtilisation du RNN...")
         steps = math.ceil(len(suffs_batch) / self.batch_vol)
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
-        suffs_preds = self.model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
+        suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         pr(self.quiet, "\tCalcul de la probabilite des mots entiers...")
         preds = np.empty(len(words))
         for i in range(len(words)):
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     arg_aut_model = arg_testtargetsfile.split(sep="_")[0]+"_model.txt"
     spex = SpexExpress(arg_model, arg_lrows_lcols, arg_testfile, arg_testtargetsfile, arg_aut_model, context_a)
     spex.ready()
+
     for rank in arg_ranks:
         est = spex.extr(rank)
-        sp.Automaton.write(est.automaton, filename=("aut-{0}-{1}".format(context_a, rank)))
+        # sp.Automaton.write(est.automaton, filename=("aut-{0}-{1}".format(context_a, rank)))

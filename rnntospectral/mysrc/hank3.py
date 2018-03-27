@@ -113,7 +113,7 @@ class SpexRandDrop(SpexHush):
         pr(self.quiet, "\tUtilisation du RNN...")
         steps = math.ceil(len(suffs_batch) / self.batch_vol)
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
-        suffs_preds = self.model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
+        suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         suffs_dict = {}
         for k in range(len(suffs_batch)):
             suffs_dict[suffs_batch[k]] = suffs_preds[k]

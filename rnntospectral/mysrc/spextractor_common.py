@@ -6,7 +6,6 @@ import parse3 as parse
 import sys
 import keras
 import scores
-import splearn.datasets.base as spparse
 import splearn as sp
 
 
@@ -186,9 +185,9 @@ class Spex:
         self.batch_vol = 2048
         self.randwords_minlen = 0
         self.randwords_maxlen = 70
-        self.randwords_nb = 10000  # Attention risque de boucle infinie si trop de mots !
+        self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
         # Arguments :
-        self.model = keras.models.load_model(modelfile)
+        self.rnn_model = keras.models.load_model(modelfile)
         self.lrows = lrows
         self.lcols = lcols
         self.perplexity_train = perp_train
@@ -196,8 +195,8 @@ class Spex:
         self.perplexity_model = perp_model
         self.context = context
         # Attributes derived from arguments :
-        self.nalpha = int(self.model.output.shape[1])-2
-        self.pad = int(self.model.input.shape[1])
+        self.nalpha = int(self.rnn_model.output.shape[1]) - 2
+        self.pad = int(self.rnn_model.input.shape[1])
         self.perplexity_calc = (perp_train != "" and perp_targ != "" and perp_model != "")
         # Computed attributes
         self.prefixes = None
@@ -207,47 +206,58 @@ class Spex:
         self.lhankels = None
         # Perplexity calculations attributes
         #       Test sample :
-        self.x_test_rnnf = None
-        self.x_test_spf = None
+        self.x_test = None
         self.y_test = None
         self.y_test_rnn = None
         self.test_self_perp = None
         self.test_rnn_perp = None
         self.test_rnn_kl = None
+        self.test_self_wer = None
+        self.test_rnn_wer = None
+        self.test_rnn_ndcg1 = None
+        self.test_rnn_ndcg5 = None
         #       Random generated words :
-        self.perp_model = None
+        self.true_automaton = None
         self.x_rand = None
         self.y_rand = None
         self.y_rand_rnn = None
         self.rand_self_perp = None  # rand sample self perplexity
         self.rand_rnn_perp = None  # rnn perplexity on rand
         self.test_rnn_kl_rand = None  # kl div between model and rnn on rand sample
+        self.rnn_words = None
+        #       RNN Generated words:
+        self.x_rnnw = None
+        self.rnnw_rnn_wer = None
 
     def ready(self):
         if self.perplexity_calc:
             pr(self.quiet, "Perplexity preparations...")
+            self.true_automaton = sp.Automaton.load_Pautomac_Automaton(self.perplexity_model)
             #  Test sample :
-            self.x_test_rnnf = parse.parse_fullwords(self.perplexity_train)
-            self.x_test_spf = spparse.load_data_sample(self.perplexity_train).data
+            self.x_test = parse.parse_fullwords(self.perplexity_train)
             self.y_test = parse.parse_pautomac_results(self.perplexity_target)
-            # self.y_test_rnnproba = self.fix_probas(self.proba_words_normal(self.x_test_rnnf, asdict=False))
-            self.y_test_rnn = self.proba_words_normal(self.x_test_rnnf, asdict=False)
+            self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True)
+            self.test_rnn_wer = e/t
+            t, e = scores.wer_aut(self.true_automaton, self.x_test)
+            self.test_self_wer = e/t
 
             self.test_self_perp = scores.pautomac_perplexity(self.y_test, self.y_test)
             self.test_rnn_perp = scores.pautomac_perplexity(self.y_test, self.y_test_rnn)
             self.test_rnn_kl = scores.kullback_leibler(self.y_test, self.y_test_rnn)
+            self.test_rnn_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1)
+            self.test_rnn_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5)
             #  Random generated words :
-            self.perp_model = sp.Automaton.load_Pautomac_Automaton(self.perplexity_model)
-            # dopage(self.perp_model, 1000)
             self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
-            self.y_rand = [self.perp_model.val(w) for w in self.x_rand]
-            # self.y_rand_rnnproba = self.fix_probas(self.proba_words_normal(self.x_rand, asdict=False))
+            # noinspection PyTypeChecker
+            self.y_rand = [self.true_automaton.val(w) for w in self.x_rand]
             self.y_rand_rnn = self.proba_words_normal(self.x_rand, asdict=False)
-
             self.rand_self_perp = scores.pautomac_perplexity(self.y_rand, self.fix_probas(self.y_rand))
             self.rand_rnn_perp = scores.pautomac_perplexity(self.y_rand, self.y_rand_rnn)
             self.test_rnn_kl_rand = scores.kullback_leibler(self.y_rand, self.y_rand_rnn)
-            del self.x_test_rnnf
+            #  Rnn generated words:
+            self.x_rnnw = gen_rnn(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
+            garb, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True)
+            self.rnnw_rnn_wer = e/t
         # *********
         pr(self.quiet, "Prefixes, suffixes, words, ...")
         self.prefixes, self.suffixes, self.words = self.gen_words()
@@ -273,7 +283,7 @@ class Spex:
             spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
             # OK on a du a peu près rattraper l'état après fit.
         except ValueError:
-            pr(True, "Erreur rang trop gros pour la longueur des mots")
+            pr(False, "Erreur rang trop gros pour la longueur des mots")
             return None
         pr(self.quiet, "... Done !")
         # Perplexity :
@@ -281,20 +291,30 @@ class Spex:
         if self.perplexity_calc:
             # Test file
             print("METRICS :")
-            y_test_extr = spectral_estimator.predict(self.x_test_spf)
+            extr_aut = spectral_estimator.automaton
+            y_test_extr = [extr_aut.val(w) for w in self.x_test]
             test_extr_perp = scores.pautomac_perplexity(self.y_test, self.fix_probas(y_test_extr))
             rnn_extr_kl = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
             test_extr_kl = scores.kullback_leibler(self.y_test, self.fix_probas(y_test_extr))
-
+            test_rnn_extr_ndcg1 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1)
+            test_model_extr_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1)
+            rnnw_rnn_extr_ndcg1 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1)
+            test_rnn_extr_ndcg5 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5)
+            test_model_extr_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5)
+            rnnw_rnn_extr_ndcg5 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5)
             # Random words
             # y_rand_extr = self.fix_probas(spectral_estimator.predict(self.x_rand_spf))
-            y_rand_extr = [spectral_estimator.automaton.val(w) for w in self.x_rand]
+            y_rand_extr = [extr_aut.val(w) for w in self.x_rand]
 
             # y_rand_extr = self.fix_probas(y_rand_extr)
             rand_extr_perp = scores.pautomac_perplexity(self.y_rand, self.fix_probas(y_rand_extr))  # extr perp
             rnn_extr_kl_rand = scores.kullback_leibler(self.y_rand_rnn, self.fix_probas(y_rand_extr))  # rnn-extr-kl
             extr_rnn_kl_rand = scores.kullback_leibler(y_rand_extr, self.y_rand_rnn)  # extr-rnn-kl
             model_extr_kl_rand = scores.kullback_leibler(self.y_rand, self.fix_probas(y_rand_extr))  # model-extr kl
+            t, e = scores.wer_aut(extr_aut, self.x_test)
+            test_extr_wer = e/t
+            t, e = scores.wer_aut(extr_aut, self.x_rnnw)
+            rnnw_extr_wer = e/t
 
             eps_kl_test_modelrnn_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
             eps_pepr_test_target_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
@@ -334,14 +354,48 @@ class Spex:
                           100*eps_kl_rand_rnn_extr, rnn_extr_kl_rand,
                           extr_rnn_kl_rand,
                           100*eps_kl_rand_model_extr, model_extr_kl_rand,))
+            print("\t(1-WER) Accuracy Rate on test file :")
+            print("\t\t********\tModel :\t{0}\n"
+                  "\t\t********\tRNN :\t{1}\n"
+                  "\t\t********\tExtr :\t{2}\n"
+                  .format(1-self.test_self_wer,
+                          1-self.test_rnn_wer,
+                          1-test_extr_wer))
+            print("\t(1-WER) Accuracy Rate on RNN-generated words :")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t********\tExtr :\t{1}\n"
+                  .format(1-self.rnnw_rnn_wer,
+                          1-rnnw_extr_wer))
+            print("\tNDCG:1 on test file :")
+            print("\t\t********\tModel-RNN :\t{0}\n"
+                  "\t\t********\tRNN-Extr :\t{1}\n"
+                  "\t\t********\tModel-Extr :\t{2}\n"
+                  .format(self.test_rnn_ndcg1,
+                          test_rnn_extr_ndcg1,
+                          test_model_extr_ndcg1))
+            print("\tNDCG:1 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}\n"
+                  .format(rnnw_rnn_extr_ndcg1))
+            print("\tNDCG:5 on test file :")
+            print("\t\t********\tModel-RNN :\t{0}\n"
+                  "\t\t********\tRNN-Extr :\t{1}\n"
+                  "\t\t********\tModel-Extr :\t{2}\n"
+                  .format(self.test_rnn_ndcg5,
+                          test_rnn_extr_ndcg5,
+                          test_model_extr_ndcg5))
+            print("\tNDCG:5 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}\n"
+                  .format(rnnw_rnn_extr_ndcg5))
+
+            # print(scores.ndcg5(self.x_test, self.rnn_model, spectral_estimator.automaton))
         #
         return spectral_estimator
 
     def hankels(self):
         return []
 
-    def proba_words_normal(self, words, asdict=True):
-        return proba_words_para(self.model, words, self.nalpha, asdict, self.quiet)
+    def proba_words_normal(self, words, asdict=True, wer=False, gen=False):
+        return proba_words_para(self.rnn_model, words, self.nalpha, asdict, self.quiet, wer, gen)
 
     def proba_words_special(self, words, asdict=True):
         return self.proba_words_normal(words, asdict)
@@ -375,12 +429,6 @@ class Spex:
                 ret[i] = seq[i]
         # pr(self.quiet, "(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n + z, len(seq), n, z))
         return ret
-
-    # @staticmethod
-    # def splearn_code(words):
-    #     le = max([len(w) for w in words])
-    #     wc = [w+([-1]*(le-len(w))) for w in words]
-    #     return np.array(wc)
 
 
 # SpexHush correspond a Hank3 et Hank4, ceux qui utilisent Hush
@@ -471,7 +519,7 @@ def pr(quiet=False, m=""):
         sys.stdout.flush()
 
 
-def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
+def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
     # #### PARAMS : ####
     bsize = 512
     nthreads = 16
@@ -511,47 +559,70 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
         prefixes_dict[key] = wpreds[i]
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
+    total = 0
+    errors = 0
     if not quiet:
         print("\tCalculating fullwords probas...")
         sys.stdout.flush()
+    genwords = list()
     for i in range(len(words)):
         word = tuple([x for x in words[i]])+(nalpha+1,)
         acc = 1.0
+        genword = list()
         for k in range(len(word)):
             pref = word[:k][-pad:]
-            try:
-                proba = prefixes_dict[pref][word[k]]
-                acc *= proba
-            except KeyError:
-                print("gabuzomeu !", pref)
+            proba = prefixes_dict[pref][word[k]]
+            acc *= proba
+            if wer:
+                total += 1
+                next_symb = np.argmax(prefixes_dict[pref])
+                if next_symb != word[k]:
+                    errors += 1
+            if gen:
+                next_symb = np.argmax(prefixes_dict[pref])
+                genword += [next_symb]
         preds[i] = acc
-        # if not quiet:
-        #     print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, len(batch_words)), end="")
-    # if not quiet:
-    #     print("\r\tCalculating fullwords probas OK                         ")
-    #     sys.stdout.flush()
+        if gen:
+            genwords += [genword]
+    # RETURN :
+    # tuple_ret = tuple()
+    # if asdict:
+    #     probas = dict()
+    #     for i in range(len(words)):
+    #         probas[tuple(words[i])] = preds[i]
+    #     tuple_ret += (probas,)
+    # else:
+    #     tuple_ret += (preds,)
+    # if wer:
+    #     tuple_ret += (total, errors)
+    # if gen:
+    #     tuple_ret += (genwords,)
+    # return tuple_ret
     if asdict:  # On retourne un dictionnaire
         probas = dict()
         for i in range(len(words)):
             probas[tuple(words[i])] = preds[i]
-        return probas
+        if wer:
+            if gen:
+                return probas, total, errors, genwords
+            else:
+                return probas, total, errors
+        else:
+            if gen:
+                return probas, genwords
+            else:
+                return probas
     else:  # On retourne une liste
-        return preds
-
-
-def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
-    z = 0
-    n = 0
-    for i in range(len(seq)):
-        if seq[i] < p:
-            seq[i] = f
-            n += 1
-        elif seq[i] == p:
-            seq[i] = f
-            z += 1
-    if not quiet:
-        print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
-    return seq
+        if wer:
+            if gen:
+                return preds, total, errors, genwords
+            else:
+                return preds, total, errors
+        else:
+            if gen:
+                return preds, genwords
+            else:
+                return preds
 
 
 def neg_zero(seq1, seq2):
@@ -568,10 +639,39 @@ def neg_zero(seq1, seq2):
     # print("Overlap neg / zero : {0}".format(neg_cover/neg))
     return epsilon_used/len(seq1)
 
-def dopage(aut, coeff):
-    aut.initial = np.array([coeff*elt for elt in aut.initial])
-    aut.final = np.array([coeff*elt for elt in aut.final])
-    aut.transitions = [np.array([coeff*elt for elt in symb]) for symb in aut.transitions]
+
+def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
+    nalpha = int(model.output.shape[1]) - 2
+    pad = int(model.input.shape[1])
+    words = list()
+    dico = dict()
+    random.seed()
+    for seed in seeds:
+        for n in range(nb_per_seed):
+            word = list(seed)
+            enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in seed], pad)
+            while ((len(word) == 0) or (word[-1] != nalpha+1)) and len(word) <= maxlen:
+                try:
+                    probas = dico[tuple(enc_word)]
+                except KeyError:
+                    probas = model.predict(np.array([enc_word]))
+                    dico[tuple(enc_word)] = probas
+                r = random.random()
+                borne = probas[0][0]
+                i = 0
+                while r > borne:
+                    i += 1
+                    borne += probas[0][i]
+                word += [i]
+                enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
+            if len(word) >= maxlen:
+                word += [nalpha+1]
+            # Il faut enlever le symbole de fin, par convention entre les fonctions les mots circulent toujours
+            # sans aucun encodage : pas de symbole de fin, de début, de +1, ...
+            # Si le dernier n'est pas un symbole de fin maisun autre, ben on l'enlève quand même, pas grave.
+            # C'est pour ça qu'on ajoute 1 a maxlen.
+            words.append(word[:-1])
+    return words
 
 
 # #######
@@ -649,3 +749,18 @@ def countlen(seq, le):
         if len(seq[i]) > le:
             k += 1
     return k
+
+
+def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
+    z = 0
+    n = 0
+    for i in range(len(seq)):
+        if seq[i] < p:
+            seq[i] = f
+            n += 1
+        elif seq[i] == p:
+            seq[i] = f
+            z += 1
+    if not quiet:
+        print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
+    return seq
