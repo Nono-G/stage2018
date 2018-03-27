@@ -1,24 +1,13 @@
-SPiCe_Offline/*
-docs/*
-spicetest/.idea/*
-spicetest/venv
-spicetest/data/*
-spicetest/models/*
-spicetest/ret
-spicetest/splearn
 rnntospectral/.idea/*
 rnntospectral/data/*
 rnntospectral/models/*
 rnntospectral/auts/*
 ta-local3.key
 CNRS2chaine.crt
-tensorflow
-tempenv
 scikit-splearn
-rnntospectral/splearn
 rnntospectral/mysrc/__pycache__/*.pyc
 rnntospectral/mysrc/aut-*
-bazel*
 .idea
 rnntospectral/venv
+tensorflow*
 
