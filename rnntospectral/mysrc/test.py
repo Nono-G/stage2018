@@ -70,7 +70,11 @@ print(x_test.shape)
 # scores = model.evaluate(x_test, y_test)
 # print(scores)
 pred = model.predict(x_test, len(x_test))
+if pred.shape[1] > a+2:
+    print("couic la colonne de padding !")
+    pred = np.delete(pred, 0, axis=1)
 pred = np.array([parse.best_n_args(aaa, 5) for aaa in pred])
+pred[pred == 5] = -1
 s = sc.spice_score(pred, targets_file)
 print(s)
 

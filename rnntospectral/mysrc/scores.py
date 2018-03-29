@@ -113,10 +113,13 @@ def wer_aut(aut, input_words, expected_words=None):
 
 def get_proba_m(model, prefix):
     try:
-        nalpha = int(model.output.shape[1]) - 2
+        nalpha = int(model.layers[0].input_dim) - 3
         pad = int(model.input.shape[1])
-        probas = model.predict(np.array([parse.pad_0([nalpha+1]+[elt+1 for elt in prefix], pad)]))[0]
-        probas = list(probas)
+        probas = model.predict(np.array([parse.pad_0([nalpha+1]+[elt+1 for elt in prefix], pad)]))
+        if probas.shape[1] > nalpha + 2:
+            print("couic la colonne de padding !")
+            probas = np.delete(probas, 0, axis=1)
+        probas = list(probas[0])
         del probas[-2]
         return probas
     except AttributeError:

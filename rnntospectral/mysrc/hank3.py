@@ -114,6 +114,9 @@ class SpexRandDrop(SpexHush):
         steps = math.ceil(len(suffs_batch) / self.batch_vol)
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
         suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
+        if suffs_preds.shape[1] > self.nalpha + 2:
+            print("couic la colonne de padding !")
+            suffs_preds = np.delete(suffs_preds, 0, axis=1)
         suffs_dict = {}
         for k in range(len(suffs_batch)):
             suffs_dict[suffs_batch[k]] = suffs_preds[k]

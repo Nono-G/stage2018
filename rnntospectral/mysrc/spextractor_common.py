@@ -195,7 +195,8 @@ class Spex:
         self.perplexity_model = perp_model
         self.context = context
         # Attributes derived from arguments :
-        self.nalpha = int(self.rnn_model.output.shape[1]) - 2
+        # self.nalpha = int(self.rnn_model.output.shape[1]) - 2
+        self.nalpha = int(self.rnn_model.layers[0].input_dim) - 3
         self.pad = int(self.rnn_model.input.shape[1])
         self.perplexity_calc = (perp_train != "" and perp_targ != "" and perp_model != "")
         # Computed attributes
@@ -549,6 +550,9 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, 
     # Prédiction :
     # print(len(batch_prefixes_lists)-len(set([tuple(elt) for elt in batch_prefixes])))
     wpreds = model.predict(batch_prefixes_lists, bsize, verbose=(0 if quiet else 1))
+    if wpreds.shape[1] > nalpha + 2:
+        print("couic la colonne de padding !")
+        wpreds = np.delete(wpreds, 0, axis=1)
     prefixes_dict = dict()
     for i in range(len(batch_prefixes_lists)):
         key = batch_prefixes_lists[i]
@@ -641,7 +645,8 @@ def neg_zero(seq1, seq2):
 
 
 def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
-    nalpha = int(model.output.shape[1]) - 2
+    nalpha = int(model.layers[0].input_dim) - 3
+
     pad = int(model.input.shape[1])
     words = list()
     dico = dict()
@@ -655,6 +660,9 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
                     probas = dico[tuple(enc_word)]
                 except KeyError:
                     probas = model.predict(np.array([enc_word]))
+                    if probas.shape[1] > nalpha + 2:
+                        print("couic la colonne de padding !")
+                        probas = np.delete(probas, 0, axis=1)
                     dico[tuple(enc_word)] = probas
                 r = random.random()
                 borne = probas[0][0]
@@ -720,6 +728,9 @@ def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
     batch = np.array(batch)
     # Prédiction :
     wpreds = model.predict(batch, bsize, verbose=(0 if quiet else 1))
+    if wpreds.shape[1] > nalpha + 2:
+        print("couic la colonne de padding !")
+        wpreds = np.delete(wpreds, 0, axis=1)
     if not quiet:
         print("\tPredicting OK\n\tCalculating fullwords probas:", end="")
     offset = 0
