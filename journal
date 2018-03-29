@@ -533,6 +533,15 @@ Pistes de continuation :
 
 Jeudi 29 Mars : 10h30 - 18h (ns yerba)
 Nettoyage des gravats des travaux d'hier, gros apprentissages à venir.
+Accélération nette de ndcg (faster_ndcg), rangements du code, factorisations.
+[
+Enigme : Mon RNN est censé etre stateless, et pourtant, l'ordre dans le batch semble avoir un impact
+infinitésimal sur le résultat. Expérience preuve : évaluer pref () seul, au millieu d'un batch, puis
+seul a nouveau : les deux valeurs en seul sont égales, l'autre diffère un tout petit peu.
+Assez pour foirer un assert en tout cas.
+]
+Je fais le générateur de mots sur automates pour créer de nouveaux ensembles de test comme préconisé
+par SA. Ok c'est fait, ça marche, c'est OK, on les trouve sous le nom "devtest".
 
 Vendredi 30 Mars :
 
