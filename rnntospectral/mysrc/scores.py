@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import parse3 as parse
+import spextractor_common
 
 
 def find_proba(letter, target):
@@ -111,58 +112,24 @@ def wer_aut(aut, input_words, expected_words=None):
     return total, errors
 
 
-def get_proba_m(model, prefix):
-    try:
-        nalpha = int(model.layers[0].input_dim) - 3
-        pad = int(model.input.shape[1])
-        probas = model.predict(np.array([parse.pad_0([nalpha+1]+[elt+1 for elt in prefix], pad)]))
-        if probas.shape[1] > nalpha + 2:
-            print("couic la colonne de padding !")
-            probas = np.delete(probas, 0, axis=1)
-        probas = list(probas[0])
-        del probas[-2]
-        return probas
-    except AttributeError:
-        try:
-            nalpha = model.nbL
-            big_a = np.zeros((model.nbS, model.nbS))
-            for t in model.transitions:
-                big_a = np.add(big_a, t)
-            alpha_tilda_inf = np.subtract(np.identity(model.nbS), big_a)
-            alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
-            alpha_tilda_inf = np.dot(alpha_tilda_inf, model.final)
-            u = model.initial
-            for l in prefix:
-                u = np.dot(u, model.transitions[l])
-            probas = np.empty(nalpha + 1)
-            for symb in range(nalpha):
-                probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
-            probas[nalpha] = np.dot(u, model.final)
-            return probas
-        except AttributeError:
-            return None
-
-
 # Attention a ce que ncdcg_l soit <= la longueur de l'alphabet
-def ndcg(words, ref, approx, ndcg_l=5):
-    dic_ref = dict()
-    dic_approx = dict()
+def faster_ndcg(words, ref, approx, ndcg_l=5):
+    try:
+        dic_ref = spextractor_common.proba_all_prefixes_rnn(ref, words, del_start_symb=True)
+    except AttributeError:
+        dic_ref = spextractor_common.proba_all_prefixes_aut(ref, words)
+    try:
+        dic_approx = spextractor_common.proba_all_prefixes_rnn(approx, words, del_start_symb=True)
+    except AttributeError:
+        dic_approx = spextractor_common.proba_all_prefixes_aut(approx, words)
     s = 0
     nbprefs = 0
-    for ix, w in enumerate(words):
+    for w in words:
         for p in range(len(w)):
             pref = w[:p]
             nbprefs += 1
-            try:
-                a = dic_approx[tuple(pref)]
-            except KeyError:
-                a = parse.best_n_args(get_proba_m(approx, pref), ndcg_l)
-                dic_approx[tuple(pref)] = a
-            try:
-                probas = dic_ref[tuple(pref)]
-            except KeyError:
-                probas = get_proba_m(ref, pref)
-                dic_ref[tuple(pref)] = probas
+            a = parse.best_n_args(dic_approx[tuple(pref)], ndcg_l)
+            probas = list(dic_ref[tuple(pref)])
             p = parse.best_n_args(probas, ndcg_l)
             top = 0
             bottom = 0
@@ -176,4 +143,68 @@ def ndcg(words, ref, approx, ndcg_l=5):
 
 
 def ndcg5(words, ref, approx):
-    return ndcg(words, ref, approx, ndcg_l=5)
+    return faster_ndcg(words, ref, approx, ndcg_l=5)
+
+# Remplacé par faster_ndcg depuis
+# Attention a ce que ncdcg_l soit <= la longueur de l'alphabet
+# def ndcg(words, ref, approx, ndcg_l=5):
+#     dic_ref = dict()
+#     dic_approx = dict()
+#     s = 0
+#     nbprefs = 0
+#     for w in words:
+#         for p in range(len(w)):
+#             pref = w[:p]
+#             nbprefs += 1
+#             try:
+#                 a = dic_approx[tuple(pref)]
+#             except KeyError:
+#                 a = parse.best_n_args(get_proba_m(approx, pref), ndcg_l)
+#                 dic_approx[tuple(pref)] = a
+#             try:
+#                 probas = dic_ref[tuple(pref)]
+#             except KeyError:
+#                 probas = get_proba_m(ref, pref)
+#                 dic_ref[tuple(pref)] = probas
+#             p = parse.best_n_args(probas, ndcg_l)
+#             top = 0
+#             bottom = 0
+#             for k in range(ndcg_l):  # 0 1 2 3 4
+#                 log = math.log((k+2), 2)
+#                 top += (probas[a[k]])/log
+#                 bottom += (probas[p[k]])/log
+#             s += (top/bottom)
+#     s = s / nbprefs
+#     return s
+
+
+# def get_proba_m(model, prefix):
+#     try:
+#         nalpha = int(model.layers[0].input_dim) - 3
+#         pad = int(model.input.shape[1])
+#         probas = model.predict(np.array([parse.pad_0([nalpha+1]+[elt+1 for elt in prefix], pad)]))
+#         if probas.shape[1] > nalpha + 2:
+#             print("couic la colonne de padding !")
+#             probas = np.delete(probas, 0, axis=1)
+#         probas = list(probas[0])
+#         del probas[-2]
+#         return probas
+#     except AttributeError:
+#         try:
+#             nalpha = model.nbL
+#             big_a = np.zeros((model.nbS, model.nbS))
+#             for t in model.transitions:
+#                 big_a = np.add(big_a, t)
+#             alpha_tilda_inf = np.subtract(np.identity(model.nbS), big_a)
+#             alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+#             alpha_tilda_inf = np.dot(alpha_tilda_inf, model.final)
+#             u = model.initial
+#             for l in prefix:
+#                 u = np.dot(u, model.transitions[l])
+#             probas = np.empty(nalpha + 1)
+#             for symb in range(nalpha):
+#                 probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
+#             probas[nalpha] = np.dot(u, model.final)
+#             return probas
+#         except AttributeError:
+#             return None

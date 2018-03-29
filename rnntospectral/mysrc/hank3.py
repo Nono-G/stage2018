@@ -188,7 +188,8 @@ if __name__ == "__main__":
         arg_testtargetsfile = ""
         arg_perp = False
 
-    spex = SpexRandDrop(arg_model, arg_lrows, arg_lcols, arg_coeffcols, arg_coeffrows, arg_testfile, arg_testtargetsfile, context_a)
+    spex = SpexRandDrop(arg_model, arg_lrows, arg_lcols, arg_coeffcols, arg_coeffrows,
+                        arg_testfile, arg_testtargetsfile, context_a)
     spex.ready()
     for rank in arg_ranks:
         est = spex.extr(rank)

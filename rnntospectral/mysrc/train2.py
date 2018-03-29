@@ -47,8 +47,8 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
         losses.append(h.history["loss"][0])
         if pautomac:
             pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
-                                                            spextractor_common.proba_words_para(model, pautomac_test,
-                                                                                                nalpha, False, True)))
+                                                            spextractor_common.proba_words_2(model, pautomac_test,
+                                                                                             nalpha, False, True)))
         for e in range(i):
             print("Loss at epoch {0} : {1}".format(e+1, losses[e]))
             if pautomac:

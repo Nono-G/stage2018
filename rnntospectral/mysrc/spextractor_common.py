@@ -33,33 +33,6 @@ class ParaCombinaisons(threading.Thread):
         comb4(self.a, self.r, self.p, self.nalpha)
 
 
-class ParaBatch(threading.Thread):
-    def __init__(self, s, nalpha, pad):
-        threading.Thread.__init__(self)
-        self.words = s
-        self.nalpha = nalpha
-        self.pad = pad
-        self.batch_words = []
-        self.batch_prefixes = []
-
-    def run(self):
-        # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
-        # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
-        encoded_words = [([self.nalpha + 1] + [1 + elt2 for elt2 in elt] + [self.nalpha + 2]) for elt in self.words]
-        batch = []
-        nbw = len(encoded_words)
-        for i in range(nbw):
-            word = encoded_words[i]
-            # prefixes :
-            batch += [word[:j] for j in range(1, len(word))]
-        # padding :
-        batch = [parse.pad_0(elt, self.pad) for elt in batch]
-        # tuplisation, setisation
-        batch = set([tuple(elt) for elt in batch])
-        self.batch_prefixes = batch
-        self.batch_words = encoded_words
-
-
 class ParaWords(threading.Thread):
     def __init__(self, prefixes, suffixes, letter, hush, subthreads=1, print_id=-1, quiet=True):
         threading.Thread.__init__(self)
@@ -195,7 +168,6 @@ class Spex:
         self.perplexity_model = perp_model
         self.context = context
         # Attributes derived from arguments :
-        # self.nalpha = int(self.rnn_model.output.shape[1]) - 2
         self.nalpha = int(self.rnn_model.layers[0].input_dim) - 3
         self.pad = int(self.rnn_model.input.shape[1])
         self.perplexity_calc = (perp_train != "" and perp_targ != "" and perp_model != "")
@@ -245,8 +217,8 @@ class Spex:
             self.test_self_perp = scores.pautomac_perplexity(self.y_test, self.y_test)
             self.test_rnn_perp = scores.pautomac_perplexity(self.y_test, self.y_test_rnn)
             self.test_rnn_kl = scores.kullback_leibler(self.y_test, self.y_test_rnn)
-            self.test_rnn_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1)
-            self.test_rnn_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5)
+            self.test_rnn_ndcg1 = scores.faster_ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1)
+            self.test_rnn_ndcg5 = scores.faster_ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5)
             #  Random generated words :
             self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
             # noinspection PyTypeChecker
@@ -297,12 +269,12 @@ class Spex:
             test_extr_perp = scores.pautomac_perplexity(self.y_test, self.fix_probas(y_test_extr))
             rnn_extr_kl = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
             test_extr_kl = scores.kullback_leibler(self.y_test, self.fix_probas(y_test_extr))
-            test_rnn_extr_ndcg1 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1)
-            test_model_extr_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1)
-            rnnw_rnn_extr_ndcg1 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1)
-            test_rnn_extr_ndcg5 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5)
-            test_model_extr_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5)
-            rnnw_rnn_extr_ndcg5 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5)
+            test_rnn_extr_ndcg1 = scores.faster_ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1)
+            test_model_extr_ndcg1 = scores.faster_ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1)
+            rnnw_rnn_extr_ndcg1 = scores.faster_ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1)
+            test_rnn_extr_ndcg5 = scores.faster_ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5)
+            test_model_extr_ndcg5 = scores.faster_ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5)
+            rnnw_rnn_extr_ndcg5 = scores.faster_ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5)
             # Random words
             # y_rand_extr = self.fix_probas(spectral_estimator.predict(self.x_rand_spf))
             y_rand_extr = [extr_aut.val(w) for w in self.x_rand]
@@ -388,7 +360,6 @@ class Spex:
             print("\t\t********\tRNN-Extr :\t{0}\n"
                   .format(rnnw_rnn_extr_ndcg5))
 
-            # print(scores.ndcg5(self.x_test, self.rnn_model, spectral_estimator.automaton))
         #
         return spectral_estimator
 
@@ -396,7 +367,7 @@ class Spex:
         return []
 
     def proba_words_normal(self, words, asdict=True, wer=False, gen=False):
-        return proba_words_para(self.rnn_model, words, self.nalpha, asdict, self.quiet, wer, gen)
+        return proba_words_2(self.rnn_model, words, self.nalpha, asdict, self.quiet, wer, gen)
 
     def proba_words_special(self, words, asdict=True):
         return self.proba_words_normal(words, asdict)
@@ -520,47 +491,65 @@ def pr(quiet=False, m=""):
         sys.stdout.flush()
 
 
-def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
-    # #### PARAMS : ####
-    bsize = 512
-    nthreads = 16
-    pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
-    # ##################
-    if not quiet:
-        print("\tProcessing words ...")
-        sys.stdout.flush()
-    words_chunks = parts_of_list(words, nthreads)
-    # Lancer les threads
-    threads = []
-    for i in range(nthreads):
-        th = ParaBatch(words_chunks[i], nalpha, pad)
-        th.start()
-        threads.append(th)
-    # Attendre les threads et collecter les résultats
-    batch_prefixes = set()
-    batch_words = []
-    for i in range(nthreads):
-        threads[i].join()
-        batch_words += threads[i].batch_words
-        # batch_prefixes += threads[i].batch_prefixes
-        batch_prefixes = batch_prefixes.union(threads[i].batch_prefixes)
-    # On restructure tout en numpy
-    batch_prefixes = [elt for elt in batch_prefixes]  # set de tuples vers liste de tuples
-    batch_prefixes_lists = np.array([list(elt) for elt in batch_prefixes])  # liste de tuples vers liste de listes
-    # Prédiction :
-    # print(len(batch_prefixes_lists)-len(set([tuple(elt) for elt in batch_prefixes])))
-    wpreds = model.predict(batch_prefixes_lists, bsize, verbose=(0 if quiet else 1))
-    if wpreds.shape[1] > nalpha + 2:
-        print("couic la colonne de padding !")
-        wpreds = np.delete(wpreds, 0, axis=1)
+def proba_all_prefixes_rnn(model, words, quiet=False, del_start_symb=False):
+    nalpha = int(model.layers[0].input_dim) - 3
+    pad = int(model.input.shape[1])
+    bsize = 2048
+    prefixes = set()
+    for w in words:
+        for i in range(len(w)+1):
+            prefixes.add(tuple(w[:i]))
+    prefixes = list(prefixes)
+    batch = list()
+    for p in prefixes:
+        enc_prefix = [nalpha+1] + [x+1 for x in list(p)]
+        enc_prefix = parse.pad_0(enc_prefix, pad)
+        batch.append(enc_prefix)
+    batch = np.array(batch)
+    predictions = model.predict(batch, bsize, verbose=(0 if quiet else 1))
+    if predictions.shape[1] > nalpha + 2:
+        predictions = np.delete(predictions, 0, axis=1)
+    if del_start_symb:
+        predictions = np.delete(predictions, -2, axis=1)
     prefixes_dict = dict()
-    for i in range(len(batch_prefixes_lists)):
-        key = batch_prefixes_lists[i]
-        #  Decodage :
-        key = tuple([elt - 1 for elt in key if elt > 0])
-        if key[0] == nalpha:
-            key = key[1:]
-        prefixes_dict[key] = wpreds[i]
+    for i in range(len(prefixes)):
+        prefixes_dict[prefixes[i]] = predictions[i]
+    return prefixes_dict
+
+
+def proba_all_prefixes_aut(model, words):
+    prefixes = set()
+    for w in words:
+        for i in range(len(w)):
+            prefixes.add(tuple(w[:i]))
+    prefixes = list(prefixes)
+    predictions = [proba_next_aut(model, p) for p in prefixes]
+    prefixes_dict = dict()
+    for i in range(len(prefixes)):
+        prefixes_dict[prefixes[i]] = predictions[i]
+    return prefixes_dict
+
+
+def proba_next_aut(aut, prefix):
+    nalpha = aut.nbL
+    big_a = np.zeros((aut.nbS, aut.nbS))
+    for t in aut.transitions:
+        big_a = np.add(big_a, t)
+    alpha_tilda_inf = np.subtract(np.identity(aut.nbS), big_a)
+    alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    alpha_tilda_inf = np.dot(alpha_tilda_inf, aut.final)
+    u = aut.initial
+    for l in prefix:
+        u = np.dot(u, aut.transitions[l])
+    probas = np.empty(nalpha + 1)
+    for symb in range(nalpha):
+        probas[symb] = np.dot(np.dot(u, aut.transitions[symb]), alpha_tilda_inf)
+    probas[nalpha] = np.dot(u, aut.final)
+    return probas
+
+
+def proba_words_2(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
+    prefixes_dict = proba_all_prefixes_rnn(model, words)
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
     total = 0
@@ -569,12 +558,14 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, 
         print("\tCalculating fullwords probas...")
         sys.stdout.flush()
     genwords = list()
-    for i in range(len(words)):
-        word = tuple([x for x in words[i]])+(nalpha+1,)
+    # for i in range(len(words)):
+    for i, _word in enumerate(words):
+        # word = tuple([x for x in words[i]])+(nalpha+1,)
+        word = _word + [nalpha+1]
         acc = 1.0
         genword = list()
         for k in range(len(word)):
-            pref = word[:k][-pad:]
+            pref = tuple(word[:k])
             proba = prefixes_dict[pref][word[k]]
             acc *= proba
             if wer:
@@ -775,3 +766,139 @@ def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
     if not quiet:
         print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
     return seq
+
+
+def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
+    # #### PARAMS : ####
+    bsize = 512
+    nthreads = 16
+    pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
+    # ##################
+    if not quiet:
+        print("\tProcessing words ...")
+        sys.stdout.flush()
+    words_chunks = parts_of_list(words, nthreads)
+    # Lancer les threads
+    threads = []
+    for i in range(nthreads):
+        th = ParaBatch(words_chunks[i], nalpha, pad)
+        th.start()
+        threads.append(th)
+    # Attendre les threads et collecter les résultats
+    batch_prefixes = set()
+    batch_words = []
+    for i in range(nthreads):
+        threads[i].join()
+        batch_words += threads[i].batch_words
+        # batch_prefixes += threads[i].batch_prefixes
+        batch_prefixes = batch_prefixes.union(threads[i].batch_prefixes)
+    # On restructure tout en numpy
+    batch_prefixes = [elt for elt in batch_prefixes]  # set de tuples vers liste de tuples
+    batch_prefixes_lists = np.array([list(elt) for elt in batch_prefixes])  # liste de tuples vers liste de listes
+    # Prédiction :
+    # print(len(batch_prefixes_lists)-len(set([tuple(elt) for elt in batch_prefixes])))
+    wpreds = model.predict(batch_prefixes_lists, bsize, verbose=(0 if quiet else 1))
+    if wpreds.shape[1] > nalpha + 2:
+        print("couic la colonne de padding !")
+        wpreds = np.delete(wpreds, 0, axis=1)
+    prefixes_dict = dict()
+    for i in range(len(batch_prefixes_lists)):
+        key = batch_prefixes_lists[i]
+        #  Decodage :
+        key = tuple([elt - 1 for elt in key if elt > 0])
+        if key[0] == nalpha:
+            key = key[1:]
+        prefixes_dict[key] = wpreds[i]
+    # Calcul de la probabilité des mots :
+    preds = np.empty(len(words))
+    total = 0
+    errors = 0
+    if not quiet:
+        print("\tCalculating fullwords probas...")
+        sys.stdout.flush()
+    genwords = list()
+    for i in range(len(words)):
+        word = tuple([x for x in words[i]])+(nalpha+1,)
+        acc = 1.0
+        genword = list()
+        for k in range(len(word)):
+            pref = word[:k][-pad:]
+            proba = prefixes_dict[pref][word[k]]
+            acc *= proba
+            if wer:
+                total += 1
+                next_symb = np.argmax(prefixes_dict[pref])
+                if next_symb != word[k]:
+                    errors += 1
+            if gen:
+                next_symb = np.argmax(prefixes_dict[pref])
+                genword += [next_symb]
+        preds[i] = acc
+        if gen:
+            genwords += [genword]
+    # RETURN :
+    # tuple_ret = tuple()
+    # if asdict:
+    #     probas = dict()
+    #     for i in range(len(words)):
+    #         probas[tuple(words[i])] = preds[i]
+    #     tuple_ret += (probas,)
+    # else:
+    #     tuple_ret += (preds,)
+    # if wer:
+    #     tuple_ret += (total, errors)
+    # if gen:
+    #     tuple_ret += (genwords,)
+    # return tuple_ret
+    if asdict:  # On retourne un dictionnaire
+        probas = dict()
+        for i in range(len(words)):
+            probas[tuple(words[i])] = preds[i]
+        if wer:
+            if gen:
+                return probas, total, errors, genwords
+            else:
+                return probas, total, errors
+        else:
+            if gen:
+                return probas, genwords
+            else:
+                return probas
+    else:  # On retourne une liste
+        if wer:
+            if gen:
+                return preds, total, errors, genwords
+            else:
+                return preds, total, errors
+        else:
+            if gen:
+                return preds, genwords
+            else:
+                return preds
+
+
+class ParaBatch(threading.Thread):
+    def __init__(self, s, nalpha, pad):
+        threading.Thread.__init__(self)
+        self.words = s
+        self.nalpha = nalpha
+        self.pad = pad
+        self.batch_words = []
+        self.batch_prefixes = []
+
+    def run(self):
+        # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
+        # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
+        encoded_words = [([self.nalpha + 1] + [1 + elt2 for elt2 in elt] + [self.nalpha + 2]) for elt in self.words]
+        batch = []
+        nbw = len(encoded_words)
+        for i in range(nbw):
+            word = encoded_words[i]
+            # prefixes :
+            batch += [word[:j] for j in range(1, len(word))]
+        # padding :
+        batch = [parse.pad_0(elt, self.pad) for elt in batch]
+        # tuplisation, setisation
+        batch = set([tuple(elt) for elt in batch])
+        self.batch_prefixes = batch
+        self.batch_words = encoded_words

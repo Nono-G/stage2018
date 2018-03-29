@@ -3,7 +3,6 @@ import sys
 import numpy as np
 # Maison :
 from spextractor_common import ParaRowsCols, pr, SpexHush
-import splearn as sp
 
 
 class SpexExpress(SpexHush):
