@@ -438,13 +438,105 @@ Je me renseigne sur WER, mais dans B. Balle les détails sont maigres, et ailleu
 chose. Je raffine un peu les mesures KL et Perp en indicant la proportion d'epsilon utilisée dans
 chaque calcul. c'est plus clair, plus net, ça permet de savoir quels nombres sont fiables ou trop
 dépendants d'epsilon.
-Vendredi 23 Mars :
+Recherches et implé de WER. On peut utiliser WER sur l'ensemble de test mais pas sur l'ensemble de
+mots aléatoires ? ça semble absurde. On alors sur les mots aléatoires mais transformés en "ce que
+prédit [RNN/Model] a partir de ce préfixe" pour voir si ils font les mêmes erreurs. Ou alors générer
+des mots avec le RNN et tester la WER de l'automate extrait la dessus. Implé de WER sur automate est
+faite, faut-il refaire un truc pour RNN ou faire en simultané un peu compliqué avec proba_words ?
 
-Lundi 26 Mars :
-Mardi 27 Mars :
-Mercredi 28 Mars :
-Jeudi 29 Mars :
+Vendredi 23 Mars : 9h-12h
+WER pour les RNN aussi, finalement pas si compliqué de le faire en même temps que l'évaluation.
+Réunion du vendredi
+Rapide réunion RE :
+Valide la métrique WER(mots générés par l'automate - automate extrait sur ces mots). à implémenter.
+Les résultats sont assez bons, a lancer sur tous les problèmes pautomacs pour de bon.
+A faire éventuellement : sauvegarde du SPEX, pour pouvoir relancer avec d'autres rangs plus tard, et
+figer l'ensemble aléatoire de mots.
+Apprendre Latex, cf Overleaf.
+
+--> S7 : (7.5)+(6.5)+(10.5)+(7.5)+3 = 35
+
+Lundi 26 Mars : 9h - 12h30 11h30 - 18h
+Plutot que générer les mots aléatoirement avec le rnn, on va utiliser les mots aléatoires comme
+'seed', comme ça pas plus de comportement aléatoire, cf WER du model sur ses propres générations qui
+est assez mauvaise. Donc test des 'mêmes erreurs'.
+Ce test donne une erreur d'un peu plus de 60%, c'est pas bon ! On a mis le doigt là ou ça fait mal ?
+Envisager un calcul a la manière du score de Spice ? (NDCG_5)
+Peut-être que ça signifie que l'extraction fonctionne bien pour les mots de forte probabilité, mais
+pas aussi bien sur les mots a faibles probabilités. Compatible avec l'intuition de ce que fait le
+spectral ?
+Réunion avec SA :
+Technique 'mêmes erreurs' discutable, car mots très improbables voire interdits. Préférer générateur
+mais alors sommes nous représentatifs de toute la distribution ? Plutôt oui.
+Envisager d'améliorer le RNN.
+J'implémente le générateur de mots de RNN, effectivement le RNN lui même fait 49% de fautes sur les
+mots qu'il a lui-même générés ! Du coup la comparaison devient difficile.
+Je travaille à implémenter NDCG pour mieux jauger.
+
+Mardi 27 Mars : 10h - 18h (ns yerba)
+(aller retour car oubli ordinateur), du coup travail effectif a 11h30
+Accélérer ndcg, vérifier pertinence, implémenter partout proprement.
+Avec un dico ça va un peu plus vite en effet, mais c'est toujours un peu lent, a cause du RNN.
+La mesure ndcg-1 donne des résultats meilleurs que WER, la solution pour vaincre l'aléatoire ? en
+effet ndcg-1 correspond a compter le nombre de fois qu'on a prédit le symbole le plus probable comme
+prochain symbole et pas forcément le vrai prochain, dans lequel vient se mêler un aléatoire qu'on ne
+peut pas prédire. Métrique pertinente je pense. Attention cependant, entre WER et NDCG l'échelle est
+inversée, faut-il présenter 1-NDCG ou 1-WER ? J'ai choisi 1-WER.
+Ok avec NDCG:1 les résultats sont pas mal.
+A faire a l'occasion : faire une politique de nommage plus stricte et uniforme sur tous les attribs
+de métriques.
+Premiers essais naïfs de pickle, ça marche pas du premier coup, a réessayer plus en détails si c'est
+vraiment nécessaire.
+Je fais des essais avec les autres problèmes pré-sélectionnés : 3 mais aussi 28 et 32. Les résultats
+sont un peu moins bons, mais toujours honorables (ndcg:1 ~ 90% entre extr et mots générés rnn).
+Est-ce qu'on passe à la phase de test grandeur nature ?
+Rangements dans le git, ajout de RE.
+Rangements cluster pour préparer grands tests -> c'est brutal mais si ça prend plus longtemps de
+retrouver le résultat d'un expérience que de la refaire à quoi bon garder les traces ?
+Tentative de lier poids de l'mbed et de la classif finale pour améliorer RNN -> oui mais leur shape
+sont très différentes, notament a cause du 0 magique de bourrage, faut-il décaler aussi les sorties?
+De plus ça impose de faire un mbed sur un vecteur de taille neurons/2, pour retomber sur la meme
+forme que la classif finale. Ou alors ajouter encore une couche à la fin. Dans tous les cas il
+faudra faire une transposition pour adapter les choses, du coup on casse le lien de pointeur ?
+Ah ben non en numpy transpose garde le lien de pointeur, les modifs sont répercutées.
+A demander a SA demain.
+
+Mercredi 28 Mars : 10h - 18h30 (ns yerba)
+Je continue a travailler a améliorer un peu le rnn, demain au plus tard il faudra lancer les expés !
+[
+Bug rigolo dans PyCharm : un fichier nommé "parse4.py" n'est pas considéré comme python, ne peut pas
+être run et tout. Même testé dans un nouveau projet ça foire. Grand Mystère !
+]
+Je consulte SA qui recommande de réécrire les fichiers décalés de 1 une bonne fois pour toutes.
+Mais ça pose problème a cause des raccourcis pris un supposant que les mots sont les entiers de 0 a
+un certain N, cf hank4. ça remettrait en cause beaucoup de choses. Donc il vaut peut-être mieux
+retraiter systématiquement le retour de model.predict(...) en enlevant les colonnes indésirables.
+Voire y compris la colonne "symbole début" et renormaliser les valeurs ?
+Au passage découverte d'un bug dans le vieux test.py, le symbole de fin est pour moi nalpha+1, pour
+la fonction d'évaluation par contre c'est -1 !
+Au final imposer des poids égaux s'est plus galère que prévu, ça demande de créer une classe custom
+qui hérite de layer, et de faire ses tripatouilles dedans.
+Ou alors il y a peut etre une solution en mettant les doigts profonds dans la prise private, je me
+renseigne dessus.
+Finalement c'est mort cette méthode, je retourne vers la class qui hérite de keras.layers.Dense
+Finalement, c'est mieux d'hériter de keras.layers.Embedding. sinon gradient vanish !
+Malheureusement ça ne fonctionne pas du tout, call est appelé une unique fois, donc pas de maj des
+poids de la couche. Ah oui en fait c'est normal, cf fonctionnement graph de TF.
+Bon ça aura pris presque toute la journée mais au final c'est enfin réussi, avec l'aide de SA
+les poids de l'embed refletent ceux de la dernière couche de classif. En termes de perfs ça crève
+pas les yeux, a tester plus en profondeur dès que possible.
+Pistes de continuation :
+ - Améliorer RNN en lui donnant l'automate comme superviseur.
+ - Présenter un automate très compréssé, donc lisible, comme approx (faible) du RNN
+ - Montrer que les calculs sont plus rapides sur automates -> IA embarquée, basse conso
+
+
+Jeudi 29 Mars : 10h30 - 18h (ns yerba)
+Nettoyage des gravats des travaux d'hier, gros apprentissages à venir.
+
 Vendredi 30 Mars :
+
+--> S8 : 8+8+(8.5)+(7.5)
 
 Lundi 2 Avril : LUNDI DE PAQUES
 Mardi 3 Avril :
