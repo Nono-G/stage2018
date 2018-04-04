@@ -366,8 +366,8 @@ class Spex:
     def hankels(self):
         return []
 
-    def proba_words_normal(self, words, asdict=True, wer=False, gen=False):
-        return proba_words_2(self.rnn_model, words, self.nalpha, asdict, self.quiet, wer, gen)
+    def proba_words_normal(self, words, asdict=True, wer=False):
+        return proba_words_2(self.rnn_model, words, asdict, self.quiet, wer)
 
     def proba_words_special(self, words, asdict=True):
         return self.proba_words_normal(words, asdict)
@@ -551,15 +551,17 @@ def proba_next_aut(aut, prefix):
     return probas
 
 
-def proba_words_2(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
+def proba_words_2(model, words, asdict=True, quiet=False, wer=False):
+    try:
+        nalpha = int(model.layers[0].input_dim) - 3
+    except AttributeError:
+        nalpha = int(model.layers[1].input_dim) - 3
     prefixes_dict = proba_all_prefixes_rnn(model, words, quiet)
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
     total = 0
     errors = 0
-    if not quiet:
-        print("\tCalculating fullwords probas...")
-        sys.stdout.flush()
+    pr(quiet, "\tCalculating fullwords probas...")
     genwords = list()
     # for i in range(len(words)):
     for i, _word in enumerate(words):
@@ -576,12 +578,7 @@ def proba_words_2(model, words, nalpha, asdict=True, quiet=False, wer=False, gen
                 next_symb = np.argmax(prefixes_dict[pref])
                 if next_symb != word[k]:
                     errors += 1
-            if gen:
-                next_symb = np.argmax(prefixes_dict[pref])
-                genword += [next_symb]
         preds[i] = acc
-        if gen:
-            genwords += [genword]
     # RETURN :
     # tuple_ret = tuple()
     # if asdict:
@@ -601,26 +598,14 @@ def proba_words_2(model, words, nalpha, asdict=True, quiet=False, wer=False, gen
         for i in range(len(words)):
             probas[tuple(words[i])] = preds[i]
         if wer:
-            if gen:
-                return probas, total, errors, genwords
-            else:
-                return probas, total, errors
+            return probas, total, errors
         else:
-            if gen:
-                return probas, genwords
-            else:
-                return probas
+            return probas
     else:  # On retourne une liste
         if wer:
-            if gen:
-                return preds, total, errors, genwords
-            else:
-                return preds, total, errors
+            return preds, total, errors
         else:
-            if gen:
-                return preds, genwords
-            else:
-                return preds
+            return preds
 
 
 def neg_zero(seq1, seq2):
@@ -640,7 +625,6 @@ def neg_zero(seq1, seq2):
 
 def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
     nalpha = int(model.layers[0].input_dim) - 3
-
     pad = int(model.input.shape[1])
     words = list()
     dico = dict()
@@ -670,7 +654,7 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
                 word += [nalpha+1]
             # Il faut enlever le symbole de fin, par convention entre les fonctions les mots circulent toujours
             # sans aucun encodage : pas de symbole de fin, de début, de +1, ...
-            # Si le dernier n'est pas un symbole de fin maisun autre, ben on l'enlève quand même, pas grave.
+            # Si le dernier n'est pas un symbole de fin mais un autre, ben on l'enlève quand même, pas grave.
             # C'est pour ça qu'on ajoute 1 a maxlen.
             words.append(word[:-1])
     return words
@@ -769,139 +753,3 @@ def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
     if not quiet:
         print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
     return seq
-
-
-def proba_words_para(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
-    # #### PARAMS : ####
-    bsize = 512
-    nthreads = 16
-    pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
-    # ##################
-    if not quiet:
-        print("\tProcessing words ...")
-        sys.stdout.flush()
-    words_chunks = parts_of_list(words, nthreads)
-    # Lancer les threads
-    threads = []
-    for i in range(nthreads):
-        th = ParaBatch(words_chunks[i], nalpha, pad)
-        th.start()
-        threads.append(th)
-    # Attendre les threads et collecter les résultats
-    batch_prefixes = set()
-    batch_words = []
-    for i in range(nthreads):
-        threads[i].join()
-        batch_words += threads[i].batch_words
-        # batch_prefixes += threads[i].batch_prefixes
-        batch_prefixes = batch_prefixes.union(threads[i].batch_prefixes)
-    # On restructure tout en numpy
-    batch_prefixes = [elt for elt in batch_prefixes]  # set de tuples vers liste de tuples
-    batch_prefixes_lists = np.array([list(elt) for elt in batch_prefixes])  # liste de tuples vers liste de listes
-    # Prédiction :
-    # print(len(batch_prefixes_lists)-len(set([tuple(elt) for elt in batch_prefixes])))
-    wpreds = model.predict(batch_prefixes_lists, bsize, verbose=(0 if quiet else 1))
-    if wpreds.shape[1] > nalpha + 2:
-        print("couic la colonne de padding !")
-        wpreds = np.delete(wpreds, 0, axis=1)
-    prefixes_dict = dict()
-    for i in range(len(batch_prefixes_lists)):
-        key = batch_prefixes_lists[i]
-        #  Decodage :
-        key = tuple([elt - 1 for elt in key if elt > 0])
-        if key[0] == nalpha:
-            key = key[1:]
-        prefixes_dict[key] = wpreds[i]
-    # Calcul de la probabilité des mots :
-    preds = np.empty(len(words))
-    total = 0
-    errors = 0
-    if not quiet:
-        print("\tCalculating fullwords probas...")
-        sys.stdout.flush()
-    genwords = list()
-    for i in range(len(words)):
-        word = tuple([x for x in words[i]])+(nalpha+1,)
-        acc = 1.0
-        genword = list()
-        for k in range(len(word)):
-            pref = word[:k][-pad:]
-            proba = prefixes_dict[pref][word[k]]
-            acc *= proba
-            if wer:
-                total += 1
-                next_symb = np.argmax(prefixes_dict[pref])
-                if next_symb != word[k]:
-                    errors += 1
-            if gen:
-                next_symb = np.argmax(prefixes_dict[pref])
-                genword += [next_symb]
-        preds[i] = acc
-        if gen:
-            genwords += [genword]
-    # RETURN :
-    # tuple_ret = tuple()
-    # if asdict:
-    #     probas = dict()
-    #     for i in range(len(words)):
-    #         probas[tuple(words[i])] = preds[i]
-    #     tuple_ret += (probas,)
-    # else:
-    #     tuple_ret += (preds,)
-    # if wer:
-    #     tuple_ret += (total, errors)
-    # if gen:
-    #     tuple_ret += (genwords,)
-    # return tuple_ret
-    if asdict:  # On retourne un dictionnaire
-        probas = dict()
-        for i in range(len(words)):
-            probas[tuple(words[i])] = preds[i]
-        if wer:
-            if gen:
-                return probas, total, errors, genwords
-            else:
-                return probas, total, errors
-        else:
-            if gen:
-                return probas, genwords
-            else:
-                return probas
-    else:  # On retourne une liste
-        if wer:
-            if gen:
-                return preds, total, errors, genwords
-            else:
-                return preds, total, errors
-        else:
-            if gen:
-                return preds, genwords
-            else:
-                return preds
-
-
-class ParaBatch(threading.Thread):
-    def __init__(self, s, nalpha, pad):
-        threading.Thread.__init__(self)
-        self.words = s
-        self.nalpha = nalpha
-        self.pad = pad
-        self.batch_words = []
-        self.batch_prefixes = []
-
-    def run(self):
-        # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
-        # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
-        encoded_words = [([self.nalpha + 1] + [1 + elt2 for elt2 in elt] + [self.nalpha + 2]) for elt in self.words]
-        batch = []
-        nbw = len(encoded_words)
-        for i in range(nbw):
-            word = encoded_words[i]
-            # prefixes :
-            batch += [word[:j] for j in range(1, len(word))]
-        # padding :
-        batch = [parse.pad_0(elt, self.pad) for elt in batch]
-        # tuplisation, setisation
-        batch = set([tuple(elt) for elt in batch])
-        self.batch_prefixes = batch
-        self.batch_words = encoded_words

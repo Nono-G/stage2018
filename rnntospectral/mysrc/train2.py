@@ -58,8 +58,8 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
         if pautomac:
             val_losses.append(model.evaluate(x_val, y_val, 2048))
             pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
-                                                            spextractor_common.proba_words_para(model, pautomac_test,
-                                                                                                nalpha, False, True)))
+                                                            spextractor_common.proba_words_2(model, pautomac_test,
+                                                                                             asdict=False, quiet=True)))
 
         if pautomac:
             for e in range(i):

@@ -12,6 +12,7 @@ class Mbed(keras.layers.Embedding):
         self.dbedl = dbedl
 
     def build(self, input_shape):
+        # noinspection PyAttributeOutsideInit
         self.embeddings = self.add_weight(
             shape=(self.input_dim, self.output_dim),
             initializer=self.embeddings_initializer,
@@ -44,7 +45,7 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
         x_train, y_train = parse.random_sample(x_train, y_train, sample)
     print(x_train.shape)
     if do_test:
-        _, x_val, y_val = parse.parse_train(test_file, wid, padbefore=True)
+        _, x_val, y_val = parse.parse_train(test_file, len(x_train[0]), padbefore=True)
         # if -1 < sample < len(x_train):
         #     x_val, y_val = parse.random_sample(x_val, y_val, sample)
 
@@ -126,9 +127,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 7:
         name = sys.argv[7]
     if len(sys.argv) > 8:
-        test_file = sys.argv[8]
+        test_file_arg = sys.argv[8]
     else:
-        test_file = None
+        test_file_arg = None
     if len(sys.argv) > 9:
         layer_arg = int(sys.argv[9])
     else:
@@ -139,4 +140,4 @@ if __name__ == "__main__":
                  .replace(" ", "_")
                  .replace("/", "+"))
     print(modelname)
-    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file, layer_arg)
+    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file_arg, layer_arg)

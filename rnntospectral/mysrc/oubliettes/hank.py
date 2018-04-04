@@ -92,7 +92,7 @@ def proba_words_para(model, words, nalpha, asdict=True, quiet=False):
     batch_words = []
     for i in range(nthreads):
         threads[i].join()
-        batch_words += threads[i].batch_words
+        batch_words += threads[i].prefixes
         # batch_prefixes += threads[i].batch_prefixes
         batch_prefixes = batch_prefixes.union(threads[i].batch_prefixes)
     # On restructure tout en numpy

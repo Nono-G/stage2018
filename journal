@@ -569,7 +569,7 @@ Journée difficile de bosser, mal a la tete, je me perd dans trop d'objectifs.
 Quelques rangements et refactoring dans les tests.
 D'après quelques expériences, il semblerait que la loss de test soit a peu près corrélée au final,
 on va donc laisser tomber la perplexité comme métrique pendant l'apprentissage, comme ça gain de
-temps de plus grande rigueur de la démarche.
+temps et plus grande rigueur de la démarche.
 
 Mercredi 4 Avril : 9h30 - 18h (ns yerba)
 Quelques rangements, passage définitif de parse3 à parse5, élégage des choses inutiles dans parseX.
@@ -579,7 +579,23 @@ les 10 premiers problèmes, pour commencer, si j'arrive a obtenir des résultats
 -rais sur les 38 autres.
 Lancés sur 2/4 machines pour pas trop squatter le cluster, cependant il semblerait que ça soit malin
 et que par défaut il y ait un cpu laissé libre pour aller avec chaque gpu, auquel cas pas besoin de
-se restreindre, on peut tout défoncer, et tant pis pour PV
+se restreindre, on peut tout défoncer, et tant pis pour PV 
+(2/4 car typo 'adfalda1' ou lieu de 'asfalda1' attention au prochain copié-collé de cette commande;
+quelle idée aussi de mettre des noms aussi bizarres que asfalda)
+Il reste a cerner le travail a faire pendant que les apprentissages mijottent pour passer a la suite
+Première idée, traquer ce peut-être-bug entre proba_para et proba_2
+Outils de parsing pour obtenir plus rapidement les résultats ? bof c'est jamais que tail a regarder
+sur quelques (6 pour la première fournée) logs par pb.
+Au fait on a pas guetté une éventuelle meilleure corrélation entre perp et métrique categ_acc.
+Petit bug idiot dans train2, on repart à la case départ et on relance...
+Concernant la différence entre proba_words_2 et proba_words_para, Elle est minime, difficile a
+cerner, elle renvoient des résultats différents pour certains préfixes (qui peuvent être n'importe
+quoi, pas de valeur particulière) et ces mêmes préfixes prédits de manière indépendante par le model
+donne raison parfois à l'un, parfois à l'autre. Au vu des mauvaises performances du multithreading,
+de la complexité supplémentaire inutile induite par le stockage de préfixes tronqués au padding dans
+proba_words_para, j'ai décidé de détruire proba_words_para. Comme ça pas de doublon qui sème la con-
+fusion.
+Dans la foulée, autres rangements divers.
 
 Jeudi 5 Avril :
 Vendredi 6 Avril :
