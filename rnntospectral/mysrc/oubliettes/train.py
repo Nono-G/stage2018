@@ -4,8 +4,6 @@ import sys
 # extra imports to set GPU options
 import tensorflow as tf
 from keras import backend as k
-import numpy as np
-
 
 if len(sys.argv) < 6 or len(sys.argv) > 8:
     sys.exit("ARGS : wid file neurons epochs batch [sampleNB] [modelname]")

@@ -3,7 +3,7 @@ import splearn as sp
 import random
 
 
-def gen(aut_file, nbw, normalized=False):
+def gen(aut_file, nbw, normalized=True):
     aut = sp.Automaton.load_Pautomac_Automaton(aut_file)
     test_set = set()
     random.seed()
@@ -55,7 +55,7 @@ def write_test_files(name, nbl, words, vals):
                 file.write(" "+str(s))
     #
     with open(name+".pautomac.devtest_sol", "w") as file:
-        file.write(str(len(words)) + " " + str(nbl))
+        file.write(str(len(words)))
         for v in vals:
             file.write("\n"+str(v))
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         try:
             name1 = sys.argv[1]
             name2 = sys.argv[2]
-            n, t, v = gen(name1+str(prob)+name2, nb_samples)
+            n, t, v = gen(name1+str(prob)+name2, nb_samples, True)
             write_test_files(name1+str(prob), n, t, v)
             print(str(prob) + " done !")
         except FileNotFoundError:

@@ -2,7 +2,7 @@ import threading
 import math
 import random
 import numpy as np
-import parse3 as parse
+import parse5 as parse
 import sys
 import keras
 import scores
@@ -492,7 +492,10 @@ def pr(quiet=False, m=""):
 
 
 def proba_all_prefixes_rnn(model, words, quiet=False, del_start_symb=False):
-    nalpha = int(model.layers[0].input_dim) - 3
+    try:
+        nalpha = int(model.layers[0].input_dim) - 3
+    except AttributeError:
+        nalpha = int(model.layers[1].input_dim) - 3
     pad = int(model.input.shape[1])
     bsize = 2048
     prefixes = set()
@@ -549,7 +552,7 @@ def proba_next_aut(aut, prefix):
 
 
 def proba_words_2(model, words, nalpha, asdict=True, quiet=False, wer=False, gen=False):
-    prefixes_dict = proba_all_prefixes_rnn(model, words)
+    prefixes_dict = proba_all_prefixes_rnn(model, words, quiet)
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
     total = 0

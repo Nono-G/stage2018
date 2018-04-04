@@ -1,10 +1,9 @@
 import keras
 import sys
 import keras.backend as k
+import numpy as np
 # Maison :
 import parse5 as parse
-import scores
-import spextractor_common
 
 
 class Mbed(keras.layers.Embedding):
@@ -31,22 +30,23 @@ class Mbed(keras.layers.Embedding):
         return out
 
 
-def trainf(train_file, wid, sample, neurons, epochs, batch,
-           pautomac=False, pautomac_test_file="", pautomac_sol_file="", layer=1):
+def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=1):
     # None things :
-    pautomac_test = None
-    pautomac_sol = None
-    pautomac_perp = []
-    # OK :
+    x_val = None
+    y_val = None
+    losses = []
+    val_losses = []
+    do_test = (test_file != "")
 
     nalpha, x_train, y_train = parse.parse_train(train_file, wid, padbefore=True)
     print(sample)
     if -1 < sample < len(x_train):
         x_train, y_train = parse.random_sample(x_train, y_train, sample)
     print(x_train.shape)
-    if pautomac:
-        pautomac_test = parse.parse_fullwords(pautomac_test_file)
-        pautomac_sol = parse.parse_pautomac_results(pautomac_sol_file)
+    if do_test:
+        _, x_val, y_val = parse.parse_train(test_file, wid, padbefore=True)
+        # if -1 < sample < len(x_train):
+        #     x_val, y_val = parse.random_sample(x_val, y_val, sample)
 
     dbedl = (keras.layers.Dense(len(y_train[0]), activation="softmax", use_bias=True))
     dbedl.build((1664, 3*nalpha))
@@ -67,28 +67,34 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
 
     model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",
                   metrics=['categorical_accuracy'])
-    if pautomac:
-        print("Pautomac base perplexity : {0}"
-              .format(scores.pautomac_perplexity(pautomac_sol, pautomac_sol)))
-    losses = []
+    # if pautomac:
+    #     print("Pautomac base perplexity : {0}"
+    #           .format(scores.pautomac_perplexity(pautomac_sol, pautomac_sol)))
+
     for i in range(1, epochs+1):
-        # pp = mmdi.predict(x_train[:5])
-        # print(pp)
         h = model.fit(x_train, y_train, batch, 1)
-        # pp = mmdi.predict(x_train[:5])
-        # print(pp)
         model.save(modelname + "-" + str(i))
         losses.append(h.history["loss"][0])
-        if pautomac:
-            pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
-                                                            spextractor_common.proba_words_2(model, pautomac_test,
-                                                                                             nalpha, False, True)))
-        for e in range(i):
-            print("Loss at epoch {0} : {1}".format(e+1, losses[e]))
-            if pautomac:
-                print("Perplexity at epoch {0} : {1}"
-                      .format(e+1, pautomac_perp[e]))
+        if do_test:
+            val_losses.append(model.evaluate(x_val, y_val, 2048))
+            # pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
+            #                                                 spextractor_common.proba_words_para(model, pautomac_test,
+            #                                                                                     nalpha, False, True)))
+
+        if do_test:
+            for e in range(i):
+                print("Loss at epoch {0} : {1} on train, {2} on validation".format(e + 1, losses[e], val_losses[e]))
+            mini = np.argmin(val_losses, axis=0)
+            print("Current best is {0} with {1}".format(mini[0]+1, val_losses[mini[0]]))
             sys.stdout.flush()
+
+            # for e in range(i):
+            #     print("Perplexity at epoch {0} : {1}".format(e+1, pautomac_perp[e]))
+            #     sys.stdout.flush()
+        else:
+            for e in range(i):
+                print("Loss at epoch {0} : {1} on train".format(e + 1, losses[e]))
+                sys.stdout.flush()
 
 
 def nono_layer(t, *args, **kwargs):
@@ -103,8 +109,8 @@ def nono_layer(t, *args, **kwargs):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 6 or len(sys.argv) > 11:
-        sys.exit("ARGS : wid file neurons epochs batch [sampleNB] [modelname] [pauttest pautsol] [layer]")
+    if len(sys.argv) < 6 or len(sys.argv) > 10:
+        sys.exit("ARGS : wid train_file neurons epochs batch [sampleNB] [modelname] [test_file] [layer]")
 
     # ARGS :
     wid_arg = int(sys.argv[1])
@@ -120,22 +126,17 @@ if __name__ == "__main__":
     if len(sys.argv) > 7:
         name = sys.argv[7]
     if len(sys.argv) > 8:
-        paut_arg = True
-        pauttest_arg = sys.argv[8]
-        pautsol_arg = sys.argv[9]
+        test_file = sys.argv[8]
     else:
-        paut_arg = False
-        pauttest_arg = None
-        pautsol_arg = None
-    if len(sys.argv) > 10:
-        layer_arg = int(sys.argv[10])
+        test_file = None
+    if len(sys.argv) > 9:
+        layer_arg = int(sys.argv[9])
     else:
         layer_arg = 1
 
-    modelname = ("model-{0}-W{1}F{2}N{3}E{4}B{5}S{6}"
-                 .format(name, wid_arg, trainfile_arg, neurons_arg, epochs_arg, batch_arg, sample_arg)
+    modelname = ("model-{0}-W{1}F{2}N{3}E{4}B{5}S{6}L{7}"
+                 .format(name, wid_arg, trainfile_arg, neurons_arg, epochs_arg, batch_arg, sample_arg, layer_arg)
                  .replace(" ", "_")
                  .replace("/", "+"))
     print(modelname)
-    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg,
-           paut_arg, pauttest_arg, pautsol_arg, layer_arg)
+    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file, layer_arg)

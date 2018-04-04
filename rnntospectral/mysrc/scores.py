@@ -1,6 +1,7 @@
 import math
 import numpy as np
-import parse3 as parse
+# import parse3 as parse
+from parse5 import best_n_args
 import spextractor_common
 
 
@@ -113,24 +114,26 @@ def wer_aut(aut, input_words, expected_words=None):
 
 
 # Attention a ce que ncdcg_l soit <= la longueur de l'alphabet
-def faster_ndcg(words, ref, approx, ndcg_l=5):
-    try:
-        dic_ref = spextractor_common.proba_all_prefixes_rnn(ref, words, del_start_symb=True)
-    except AttributeError:
-        dic_ref = spextractor_common.proba_all_prefixes_aut(ref, words)
-    try:
-        dic_approx = spextractor_common.proba_all_prefixes_rnn(approx, words, del_start_symb=True)
-    except AttributeError:
-        dic_approx = spextractor_common.proba_all_prefixes_aut(approx, words)
+def faster_ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
+    if dic_ref is None:
+        try:
+            dic_ref = spextractor_common.proba_all_prefixes_rnn(ref, words, del_start_symb=True)
+        except AttributeError:
+            dic_ref = spextractor_common.proba_all_prefixes_aut(ref, words)
+    if dic_approx is None:
+        try:
+            dic_approx = spextractor_common.proba_all_prefixes_rnn(approx, words, del_start_symb=True)
+        except AttributeError:
+            dic_approx = spextractor_common.proba_all_prefixes_aut(approx, words)
     s = 0
     nbprefs = 0
     for w in words:
         for p in range(len(w)):
             pref = w[:p]
             nbprefs += 1
-            a = parse.best_n_args(dic_approx[tuple(pref)], ndcg_l)
+            a = best_n_args(dic_approx[tuple(pref)], ndcg_l)
             probas = list(dic_ref[tuple(pref)])
-            p = parse.best_n_args(probas, ndcg_l)
+            p = best_n_args(probas, ndcg_l)
             top = 0
             bottom = 0
             for k in range(ndcg_l):  # 0 1 2 3 4

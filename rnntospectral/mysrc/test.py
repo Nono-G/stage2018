@@ -1,5 +1,5 @@
 import keras
-import parse3 as parse
+import parse5 as parse
 import scores as sc
 import sys
 import numpy as np

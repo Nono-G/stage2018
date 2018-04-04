@@ -8,7 +8,7 @@ def parse_train(filename, wid=-1, padbefore=True):
     with open(filename, 'r') as file:
         nsamples, nalpha = [int(a) for a in file.readline().split()]
         for line in file.readlines():
-            ll, (xl, yl) = parse_line(line, nalpha, wid, padbefore)
+            ll, (xl, yl) = _parse_line(line, nalpha, wid, padbefore)
             xs += xl
             ys += yl
             if ll > maxlen:
@@ -20,37 +20,37 @@ def parse_train(filename, wid=-1, padbefore=True):
     return nalpha, np.array(xs), np.array(ys)
 
 
-def parse_test_prefixes(filename, wid):
-    xs = []
-    maxlen = 0
-    with open(filename, 'r') as file:
-        nsamples, nalpha = [int(a) for a in file.readline().split()]
-        for line in file.readlines():
-            x = [nalpha+1]+[int(a)+1 for a in line.split()[1:]]
-            if wid > 0:
-                if len(x) > wid:
-                    x = x[-wid:]
-                else:
-                    x = pad_0(x, wid)
-            else:
-                if len(x) > maxlen:
-                    maxlen = len(x)
-            xs += [x]
-    if wid < 1:
-        # On finit le padding jusqu'a maxlen :
-        xs = [pad_0(a, maxlen) for a in xs]
-    return nalpha, np.array(xs)
+# def parse_test_prefixes(filename, wid):
+#     xs = []
+#     maxlen = 0
+#     with open(filename, 'r') as file:
+#         nsamples, nalpha = [int(a) for a in file.readline().split()]
+#         for line in file.readlines():
+#             x = [nalpha+1]+[int(a)+1 for a in line.split()[1:]]
+#             if wid > 0:
+#                 if len(x) > wid:
+#                     x = x[-wid:]
+#                 else:
+#                     x = pad_0(x, wid)
+#             else:
+#                 if len(x) > maxlen:
+#                     maxlen = len(x)
+#             xs += [x]
+#     if wid < 1:
+#         # On finit le padding jusqu'a maxlen :
+#         xs = [pad_0(a, maxlen) for a in xs]
+#     return nalpha, np.array(xs)
 
 
-def parse_targets(targets_file, nalpha):
-    targ = []
-    with open(targets_file, 'r') as tarf:
-        for line in tarf.readlines():
-            targ += [onehot(int(line.split()[1]), nalpha+2)]
-    return np.array(targ)
+# def parse_targets(targets_file, nalpha):
+#     targ = []
+#     with open(targets_file, 'r') as tarf:
+#         for line in tarf.readlines():
+#             targ += [onehot(int(line.split()[1]), nalpha+2)]
+#     return np.array(targ)
 
 
-def parse_line(line, nalpha, widarg, padbefore=True):
+def _parse_line(line, nalpha, widarg, padbefore=True):
     # on ajoute 1 partout pour que le zero soit libre pour servir de bourrage :
     sp = line.split()
     linelen = int(sp[0])
@@ -59,7 +59,7 @@ def parse_line(line, nalpha, widarg, padbefore=True):
     else:
         wid = widarg
     seq = [nalpha+1]+[int(a)+1 for a in sp[1:]]+[nalpha+2]
-    return linelen, windows(seq, wid, padbefore)
+    return linelen, _windows(seq, wid, padbefore)
 
 
 def pad_0(seq, size, before=True):
@@ -76,7 +76,7 @@ def pad(seq, elt, size, before=True):
         return seq[-size:]
 
 
-def windows(seq, wid, padbefore=True):
+def _windows(seq, wid, padbefore=True):
     xs = []
     ys = seq[1:]
     for i in range(1, min(wid, len(seq))):
@@ -94,14 +94,14 @@ def onehot(i, size):
     return r
 
 
-def argmax(x):
-    if len(x) < 1:
-        return -1
-    arg = 0
-    for i in range(1, len(x)):
-        if x[arg] < x[i]:
-            arg = i
-    return arg
+# def argmax(x):
+#     if len(x) < 1:
+#         return -1
+#     arg = 0
+#     for i in range(1, len(x)):
+#         if x[arg] < x[i]:
+#             arg = i
+#     return arg
 
 
 def best_n_args(seq, n):
@@ -130,27 +130,6 @@ def parse_fullwords(filename):
     return x
 
 
-def parse_fullwords_encoded(filename, padsize):
-    with open(filename, "r") as file:
-        spl = file.readline().split()
-        nbx = int(spl[0])
-        nalpha = int(spl[1])
-        x = []
-        for i in range(nbx):
-            x.append(pad_0([nalpha+1]+[int(s)+1 for s in file.readline().split()[1:]]+[nalpha+2], padsize))
-    return np.array(x)
-
-
-def to_binary_classf(y, one):
-    biny = np.empty((y.shape[0], 2))
-    for i in range(len(y)):
-        if argmax(y[i]) == one:
-            biny[i] = np.array([0, 1])
-        else:
-            biny[i] = np.array([1, 0])
-    return biny
-
-
 def random_sample(x, y, nb):
     shufflek = np.random.choice(x.shape[0], nb, replace=False)
     x_ret = x[shufflek, :]
@@ -160,7 +139,7 @@ def random_sample(x, y, nb):
 
 if __name__ == "__main__":
     print("coucou")
-    n_zz, x_zz = parse_test_prefixes("../data/prefixes/8.spice.prefix.public", 12)
-    y_zz = parse_targets("../data/targets/8.spice.target.public", n_zz)
+    # n_zz, x_zz = parse_test_prefixes("../data/prefixes/8.spice.prefix.public", 12)
+    # y_zz = parse_targets("../data/targets/8.spice.target.public", n_zz)
     # print(x)
-    print(y_zz)
+    # print(y_zz)

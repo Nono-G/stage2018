@@ -1,7 +1,7 @@
 import keras
 import sys
 # Maison :
-import parse3 as parse
+import parse5 as parse
 import scores
 import spextractor_common
 
@@ -9,9 +9,13 @@ import spextractor_common
 def trainf(train_file, wid, sample, neurons, epochs, batch,
            pautomac=False, pautomac_test_file="", pautomac_sol_file="", layer=1):
     # None things :
+    x_val = None
+    y_val = None
     pautomac_test = None
     pautomac_sol = None
     pautomac_perp = []
+    losses = []
+    val_losses = []
     # OK :
 
     nalpha, x_train, y_train = parse.parse_train(train_file, wid, padbefore=True)
@@ -22,9 +26,12 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
     if pautomac:
         pautomac_test = parse.parse_fullwords(pautomac_test_file)
         pautomac_sol = parse.parse_pautomac_results(pautomac_sol_file)
+        _, x_val, y_val = parse.parse_train(pautomac_test_file, wid, padbefore=True)
+        if -1 < sample < len(x_train):
+            x_val, y_val = parse.random_sample(x_val, y_val, sample)
 
     model = keras.models.Sequential()
-    model.add(keras.layers.Embedding(nalpha + 3, 4*nalpha, input_shape=x_train[0].shape, mask_zero=True))
+    model.add(keras.layers.Embedding(nalpha + 3, 4 * nalpha, input_shape=x_train[0].shape, mask_zero=True))
     model.add(nono_layer(layer, units=neurons, return_sequences=True, dropout=0.15))
     model.add(keras.layers.Activation('tanh'))
     model.add(nono_layer(layer, units=neurons))
@@ -33,6 +40,9 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
     model.add(keras.layers.Activation('relu'))
     model.add(keras.layers.Dense(len(y_train[0])))
     model.add(keras.layers.Activation('softmax'))
+
+    # mmdi = keras.models.Model(inputs=inp, outputs=mbed)
+
     print(model.summary())
 
     model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",
@@ -40,21 +50,28 @@ def trainf(train_file, wid, sample, neurons, epochs, batch,
     if pautomac:
         print("Pautomac base perplexity : {0}"
               .format(scores.pautomac_perplexity(pautomac_sol, pautomac_sol)))
-    losses = []
+
     for i in range(1, epochs+1):
         h = model.fit(x_train, y_train, batch, 1)
         model.save(modelname + "-" + str(i))
         losses.append(h.history["loss"][0])
         if pautomac:
+            val_losses.append(model.evaluate(x_val, y_val, 2048))
             pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
-                                                            spextractor_common.proba_words_2(model, pautomac_test,
-                                                                                             nalpha, False, True)))
-        for e in range(i):
-            print("Loss at epoch {0} : {1}".format(e+1, losses[e]))
-            if pautomac:
-                print("Perplexity at epoch {0} : {1}"
-                      .format(e+1, pautomac_perp[e]))
-            sys.stdout.flush()
+                                                            spextractor_common.proba_words_para(model, pautomac_test,
+                                                                                                nalpha, False, True)))
+
+        if pautomac:
+            for e in range(i):
+                print("Loss at epoch {0} : {1} on train, {2} on validation".format(e + 1, losses[e], val_losses[e]))
+                sys.stdout.flush()
+            for e in range(i):
+                print("Perplexity at epoch {0} : {1}".format(e+1, pautomac_perp[e]))
+                sys.stdout.flush()
+        else:
+            for e in range(i):
+                print("Loss at epoch {0} : {1} on train".format(e + 1, losses[e]))
+                sys.stdout.flush()
 
 
 def nono_layer(t, *args, **kwargs):
