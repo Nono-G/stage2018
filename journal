@@ -542,14 +542,45 @@ Assez pour foirer un assert en tout cas.
 ]
 Je fais le générateur de mots sur automates pour créer de nouveaux ensembles de test comme préconisé
 par SA. Ok c'est fait, ça marche, c'est OK, on les trouve sous le nom "devtest".
+Je lance des tests sur le cluster pour essayer de voir si oui ou non le partage de poids entre mbed
+et classif est bénéfique. Je teste sur pauto 10, avec des paramètres avec un peu d'envergure pour
+avoir de quoi trancher. Au passage utiliser 4 cores fait en effet gagner du temps sur le rnn.
+Malheureusement je vais manquer de temps pour lancer les apprentissages sur tout les jeux de données
+Pautomac, il faudra vraiment le faire demain pour le WE.
 
-Vendredi 30 Mars :
+Vendredi 30 Mars : 9h30 - 12h30
+Un bug a traquer dans proba_words_2 ? Le calcul de perplexité part en couille totalement on dirait.
+Du coup j'aurais pas le temps de lancer les apprentissages souhaités, je vais devoir le faire ce WE.
+Remise en doute de la stratégie d'apprentissage, quels métriques, quels critères ? C'est un peu le
+bazar. D'ailleuirs le lien mbed-dbed n'a toujours pas prouvé son efficacité, et ça me fait un critè-
+re de plus a prendre en compte, alors que j'ai 48 problèmes a traiter, ça va déboucher sur plusieurs
+milliers de modèles, ça me semble pas raisonnable.
+En y repensant il était absolument normal que loss et perplexité ne soient pas corrélés, car c'était
+la loss sur le train, qui se sur-apprend. Donc SA me fait calculer la loss sur le même que la perp.
+Une vraie loss, on espère que ça sera corrélé cette fois. C'est pas parfaitement le cas mais c'est
+proche en tout cas (biais sur la quantité tiré aléatoirement ?)
 
---> S8 : 8+8+(8.5)+(7.5)
+--> S8 : 8+8+(8.5)+(7.5)+3 = 35
 
 Lundi 2 Avril : LUNDI DE PAQUES
-Mardi 3 Avril :
-Mercredi 4 Avril :
+
+Mardi 3 Avril : 11h - 11h30 12h30 13h + maison
+Journée difficile de bosser, mal a la tete, je me perd dans trop d'objectifs.
+Quelques rangements et refactoring dans les tests.
+D'après quelques expériences, il semblerait que la loss de test soit a peu près corrélée au final,
+on va donc laisser tomber la perplexité comme métrique pendant l'apprentissage, comme ça gain de
+temps de plus grande rigueur de la démarche.
+
+Mercredi 4 Avril : 9h30 - 18h (ns yerba)
+Quelques rangements, passage définitif de parse3 à parse5, élégage des choses inutiles dans parseX.
+On va mettre a plat bien propre le test pour le lancer enfin !
+Arpès quelques préparations, je pense qu'on a de bonne conditions pour faire les tests, je lance sur
+les 10 premiers problèmes, pour commencer, si j'arrive a obtenir des résultats exploitables je lance
+-rais sur les 38 autres.
+Lancés sur 2/4 machines pour pas trop squatter le cluster, cependant il semblerait que ça soit malin
+et que par défaut il y ait un cpu laissé libre pour aller avec chaque gpu, auquel cas pas besoin de
+se restreindre, on peut tout défoncer, et tant pis pour PV
+
 Jeudi 5 Avril :
 Vendredi 6 Avril :
 
@@ -571,8 +602,8 @@ Mercredi 25 Avril :
 Jeudi 26 Avril :
 Vendredi 27 Avril :
 
-Lundi 30 Avril :
-Mardi 1 Mai : FETE DU TRAVAIL
+Lundi 30 Avril : (Maison ?)
+Mardi 1 Mai : FETE DU TRAVAIL (Polo)
 Mercredi 2 Mai :
 Jeudi 3 Mai :
 Vendredi 4 Mai : (sncf)
