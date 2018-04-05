@@ -7,7 +7,7 @@ import parse5 as parse
 
 
 class Mbed(keras.layers.Embedding):
-    def __init__(self, input_dim, output_dim, dbedl):
+    def __init__(self, input_dim, output_dim, dbedl, **kwargs):
         keras.layers.Embedding.__init__(self, input_dim, output_dim, mask_zero=True)
         self.dbedl = dbedl
 
@@ -31,7 +31,45 @@ class Mbed(keras.layers.Embedding):
         return out
 
 
-def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=1):
+def model_shell_normal(xsize, ysize, neurons, nalpha, layer):
+    model = keras.models.Sequential()
+    model.add(keras.layers.Embedding(nalpha + 3, 4 * nalpha, input_shape=(xsize, ), mask_zero=True))
+    model.add(nono_layer(layer, units=neurons, return_sequences=True, dropout=0.15))
+    model.add(keras.layers.Activation('tanh'))
+    model.add(nono_layer(layer, units=neurons))
+    model.add(keras.layers.Activation('tanh'))
+    model.add(keras.layers.Dense(int(neurons / 2)))
+    model.add(keras.layers.Activation('relu'))
+    model.add(keras.layers.Dense(ysize))
+    model.add(keras.layers.Activation('softmax'))
+    return model
+
+
+def model_shell_dbed(xsize, ysize, neurons, nalpha, layer, save_digest=False):
+    dbedl = (keras.layers.Dense(ysize, activation="softmax", use_bias=True))
+    dbedl.build((1664, 3 * nalpha))
+
+    inp = keras.layers.Input(shape=(xsize, ))
+    # mbed = (keras.layers.Embedding(nalpha + 3, 3 * nalpha, mask_zero=True))(inp)
+    mbed = (Mbed(nalpha + 3, 3 * nalpha, dbedl))(inp)
+    r1 = (nono_layer(layer, units=neurons, activation="tanh", return_sequences=True, dropout=0.15))(mbed)
+    r2 = (nono_layer(layer, units=neurons, activation="tanh"))(r1)
+    d1 = (keras.layers.Dense(int(neurons / 2), activation="relu"))(r2)
+    d2 = (keras.layers.Dense(3 * nalpha))(d1)
+    outp = dbedl(d2)
+    model = keras.models.Model(inputs=inp, outputs=outp)
+    if save_digest:
+        with open(modelname+"+DIGEST", "w") as f:
+            f.write("xsize ysize neurons nalpha layer\n")
+            f.write(str(xsize)+"\n")
+            f.write(str(ysize) + "\n")
+            f.write(str(neurons)+"\n")
+            f.write(str(nalpha)+"\n")
+            f.write(str(layer)+"\n")
+    return model
+
+
+def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=1, mode=0):
     # None things :
     x_val = None
     y_val = None
@@ -49,20 +87,12 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
         # if -1 < sample < len(x_train):
         #     x_val, y_val = parse.random_sample(x_val, y_val, sample)
 
-    dbedl = (keras.layers.Dense(len(y_train[0]), activation="softmax", use_bias=True))
-    dbedl.build((1664, 3*nalpha))
-
-    inp = keras.layers.Input(shape=x_train[0].shape)
-    # mbed = (keras.layers.Embedding(nalpha + 3, 3 * nalpha, mask_zero=True))(inp)
-    mbed = (Mbed(nalpha + 3, 3 * nalpha, dbedl))(inp)
-    r1 = (nono_layer(layer, units=neurons, activation="tanh", return_sequences=True, dropout=0.15))(mbed)
-    r2 = (nono_layer(layer, units=neurons, activation="tanh"))(r1)
-    d1 = (keras.layers.Dense(int(neurons / 2), activation="relu"))(r2)
-    d2 = (keras.layers.Dense(3*nalpha))(d1)
-    outp = dbedl(d2)
-    model = keras.models.Model(inputs=inp, outputs=outp)
-
-    # mmdi = keras.models.Model(inputs=inp, outputs=mbed)
+    if mode == 0:
+        model = model_shell_normal(len(x_train[0]), len(y_train[0]), neurons, nalpha, layer)
+    elif mode == 1:
+        model = model_shell_dbed(len(x_train[0]), len(y_train[0]), neurons, nalpha, layer, save_digest=True)
+    else:
+        raise ValueError("'mode' param must be 0 or 1")
 
     print(model.summary())
 
@@ -74,7 +104,12 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
 
     for i in range(1, epochs+1):
         h = model.fit(x_train, y_train, batch, 1)
-        model.save(modelname + "-" + str(i))
+        if mode == 0:
+            model.save(modelname + "-" + str(i))
+        elif mode == 1:
+            with open(modelname + "-" + str(i)+"-JSON", "w") as f:
+                f.write(model.to_json())
+            model.save_weights(modelname + "-" + str(i)+"-WEIGHTS")
         losses.append(h.history["loss"][0])
         if do_test:
             val_losses.append(model.evaluate(x_val, y_val, 2048))
@@ -110,8 +145,9 @@ def nono_layer(t, *args, **kwargs):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 6 or len(sys.argv) > 10:
-        sys.exit("ARGS : wid train_file neurons epochs batch [sampleNB] [modelname] [test_file] [layer]")
+    if len(sys.argv) < 6 or len(sys.argv) > 11:
+        sys.exit("ARGS : wid train_file neurons epochs batch "
+                 "[sampleNB] [modelname] [test_file] [layer] [mode: default=0=classic, 1=dbed]")
 
     # ARGS :
     wid_arg = int(sys.argv[1])
@@ -134,10 +170,16 @@ if __name__ == "__main__":
         layer_arg = int(sys.argv[9])
     else:
         layer_arg = 1
+    if len(sys.argv) > 10:
+        mode_arg = int(sys.argv[10])
+    else:
+        mode_arg = 0
 
-    modelname = ("model-{0}-W{1}F{2}N{3}E{4}B{5}S{6}L{7}"
-                 .format(name, wid_arg, trainfile_arg, neurons_arg, epochs_arg, batch_arg, sample_arg, layer_arg)
+    modelname = ("model-{0}-W{1}F{2}N{3}E{4}B{5}S{6}L{7}M{8}"
+                 .format(name, wid_arg, trainfile_arg, neurons_arg, epochs_arg,
+                         batch_arg, sample_arg, layer_arg, mode_arg)
                  .replace(" ", "_")
                  .replace("/", "+"))
     print(modelname)
-    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file_arg, layer_arg)
+    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file_arg, layer_arg, mode_arg)
+
