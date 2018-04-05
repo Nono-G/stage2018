@@ -69,6 +69,26 @@ def model_shell_dbed(xsize, ysize, neurons, nalpha, layer, save_digest=False):
     return model
 
 
+def model_shell_dbed_from_digest(filename):
+    with open(filename, "r") as file:
+        _ = file.readline()
+        xsize = int(file.readline())
+        ysize = int(file.readline())
+        neurons = int(file.readline())
+        nalpha = int(file.readline())
+        layer = int(file.readline())
+        return model_shell_dbed(xsize, ysize, neurons, nalpha, layer, save_digest=False)
+
+
+def my_load_model(f1, f2=""):
+    try:
+        model = keras.models.load_model(f1)
+    except Exception:
+        model = model_shell_dbed_from_digest(f1)
+        model.load_weights(f2)
+    return model
+
+
 def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=1, mode=0):
     # None things :
     x_val = None
@@ -107,8 +127,8 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
         if mode == 0:
             model.save(modelname + "-" + str(i))
         elif mode == 1:
-            with open(modelname + "-" + str(i)+"-JSON", "w") as f:
-                f.write(model.to_json())
+            # with open(modelname + "-" + str(i)+"-JSON", "w") as f:
+            #     f.write(model.to_json())
             model.save_weights(modelname + "-" + str(i)+"-WEIGHTS")
         losses.append(h.history["loss"][0])
         if do_test:
