@@ -1,12 +1,25 @@
+# External :
 import keras
 import sys
 import keras.backend as k
 import numpy as np
-# Maison :
+# Project :
 import parse5 as parse
 
+"""
+Runnable program to train models, and related classes and functions
+"""
 
-class Mbed(keras.layers.Embedding):
+
+class DenseLinkedEmbedding(keras.layers.Embedding):
+    """
+    Custom Keras layer, behaving like the Embedding layer, but using the weights of a specified dense layer instead of
+    having its own weights, nothing trainable here then.
+    Warning : the additional reference parameter of the constructor breaks the keras.load_model(filename) function,
+    Instead a non trained model and load weights instead !
+    """
+
+    # noinspection PyUnusedLocal
     def __init__(self, input_dim, output_dim, dbedl, **kwargs):
         keras.layers.Embedding.__init__(self, input_dim, output_dim, mask_zero=True)
         self.dbedl = dbedl
@@ -32,11 +45,20 @@ class Mbed(keras.layers.Embedding):
 
 
 def model_shell_normal(xsize, ysize, neurons, nalpha, layer):
+    """
+    Returns an untrained, uncompiled model made of : Embedding | 2*RNN | Dense | Dense for output
+    :param xsize: the length of the input sequences, sometimes called 'pad'
+    :param ysize: the dimension of the outputs, usual usage is nalpha + 3 (all letters, padding, start and end)
+    :param neurons: number of neurons in the RNN layers.
+    :param nalpha: number of letter in the alphabet
+    :param layer: Kind of RNN layer to use, see 'rnn_layer()' function
+    :return: an untrained, uncompiled model made of : Embedding | 2*RNN | 2*Dense
+    """
     model = keras.models.Sequential()
     model.add(keras.layers.Embedding(nalpha + 3, 4 * nalpha, input_shape=(xsize, ), mask_zero=True))
-    model.add(nono_layer(layer, units=neurons, return_sequences=True, dropout=0.15))
+    model.add(rnn_layer(layer, units=neurons, return_sequences=True, dropout=0.15))
     model.add(keras.layers.Activation('tanh'))
-    model.add(nono_layer(layer, units=neurons))
+    model.add(rnn_layer(layer, units=neurons))
     model.add(keras.layers.Activation('tanh'))
     model.add(keras.layers.Dense(int(neurons / 2)))
     model.add(keras.layers.Activation('relu'))
@@ -46,14 +68,26 @@ def model_shell_normal(xsize, ysize, neurons, nalpha, layer):
 
 
 def model_shell_dbed(xsize, ysize, neurons, nalpha, layer, save_digest=False):
+    """
+    Returns an untrained, uncompiled model made of : Custom Embedding | 2*RNN | 2*Dense | Dense for output
+    See custom 'DenseLinkedEmbedding' embedding class above.
+    :param xsize: the length of the input sequences, sometimes called 'pad'
+    :param ysize: the dimension of the outputs, usual usage is nalpha + 3 (all letters, padding, start and end)
+    :param neurons: number of neurons in the RNN layers.
+    :param nalpha: number of letter in the alphabet
+    :param layer: Kind of RNN layer to use, see 'rnn_layer()' function
+    :param save_digest: Must we, or not, save a file containing the other parameters, which will be used to reload the
+                        model, by instantiating a topologically equivalent model and pouring the saved weights in it ?
+    :return: an untrained, uncompiled model made of : Custom Embedding | 2*RNN | 2*Dense | Dense for output
+    """
     dbedl = (keras.layers.Dense(ysize, activation="softmax", use_bias=True))
+    # Only the last element of the input_shape tuple is used, so value 1664 is just a placeholder here
     dbedl.build((1664, 3 * nalpha))
 
     inp = keras.layers.Input(shape=(xsize, ))
-    # mbed = (keras.layers.Embedding(nalpha + 3, 3 * nalpha, mask_zero=True))(inp)
-    mbed = (Mbed(nalpha + 3, 3 * nalpha, dbedl))(inp)
-    r1 = (nono_layer(layer, units=neurons, activation="tanh", return_sequences=True, dropout=0.15))(mbed)
-    r2 = (nono_layer(layer, units=neurons, activation="tanh"))(r1)
+    mbed = (DenseLinkedEmbedding(nalpha + 3, 3 * nalpha, dbedl))(inp)
+    r1 = (rnn_layer(layer, units=neurons, activation="tanh", return_sequences=True, dropout=0.15))(mbed)
+    r2 = (rnn_layer(layer, units=neurons, activation="tanh"))(r1)
     d1 = (keras.layers.Dense(int(neurons / 2), activation="relu"))(r2)
     d2 = (keras.layers.Dense(3 * nalpha))(d1)
     outp = dbedl(d2)
@@ -70,6 +104,11 @@ def model_shell_dbed(xsize, ysize, neurons, nalpha, layer, save_digest=False):
 
 
 def model_shell_dbed_from_digest(filename):
+    """
+    Acquires parameters form a 'model digest' file, and creates a custom-embedding-model
+    :param filename: The name of the 'model digest' file
+    :return: an untrained, uncompiled model made of : Custom Embedding | 2*RNN | 2*Dense | Dense for output
+    """
     with open(filename, "r") as file:
         _ = file.readline()
         xsize = int(file.readline())
@@ -81,22 +120,45 @@ def model_shell_dbed_from_digest(filename):
 
 
 def my_load_model(f1, f2=""):
+    """
+    Can load models using either custom or stock embedding layer.
+    :param f1: File produced by keras.model.save(filename), or 'model digest' file
+    :param f2: If f1 is a 'model digest', file containing the weights of the model
+    :return: a model, trained and compiled, recreated from saved file(s).
+    """
+    # noinspection PyBroadException
     try:
+        # Stock Embedding
         model = keras.models.load_model(f1)
     except Exception:
+        # Custom Embedding
         model = model_shell_dbed_from_digest(f1)
         model.load_weights(f2)
     return model
 
 
 def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=1, mode=0):
+    """
+    Trains a model on the specified train set, with specified parameters.
+    :param train_file: name of the file containing
+    :param wid: the width of the n-grams, which is the length of the input sequences. -1 means 'the longest ever seen in
+                train set'
+    :param sample: number of prefixes to randomly pick from the train set.
+    :param neurons: number of neurons in RNN layers, see model_shell_*() functions
+    :param epochs: number of epochs of training
+    :param batch: size of the batches of samples fed to the model during training
+    :param test_file: (Optional) neme of the file containg a test or validation set, loss on this set is computed at
+                      each epoch.
+    :param layer: kind of RNN layer used, see model_shell_*() functions
+    :param mode: Do we use custom embedding layer or not ? 1 means yes, 0 means no
+    :return: a trained model
+    """
     # None things :
     x_val = None
     y_val = None
     losses = []
     val_losses = []
     do_test = (test_file != "")
-
     nalpha, x_train, y_train = parse.parse_train(train_file, wid, padbefore=True)
     print(sample)
     if -1 < sample < len(x_train):
@@ -104,56 +166,45 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
     print(x_train.shape)
     if do_test:
         _, x_val, y_val = parse.parse_train(test_file, len(x_train[0]), padbefore=True)
-        # if -1 < sample < len(x_train):
-        #     x_val, y_val = parse.random_sample(x_val, y_val, sample)
-
     if mode == 0:
         model = model_shell_normal(len(x_train[0]), len(y_train[0]), neurons, nalpha, layer)
     elif mode == 1:
         model = model_shell_dbed(len(x_train[0]), len(y_train[0]), neurons, nalpha, layer, save_digest=True)
     else:
         raise ValueError("'mode' param must be 0 or 1")
-
     print(model.summary())
-
     model.compile(optimizer=(keras.optimizers.rmsprop()), loss="categorical_crossentropy",
                   metrics=['categorical_accuracy'])
-    # if pautomac:
-    #     print("Pautomac base perplexity : {0}"
-    #           .format(scores.pautomac_perplexity(pautomac_sol, pautomac_sol)))
-
     for i in range(1, epochs+1):
         h = model.fit(x_train, y_train, batch, 1)
         if mode == 0:
             model.save(modelname + "-" + str(i))
         elif mode == 1:
-            # with open(modelname + "-" + str(i)+"-JSON", "w") as f:
-            #     f.write(model.to_json())
             model.save_weights(modelname + "-" + str(i)+"-WEIGHTS")
         losses.append(h.history["loss"][0])
         if do_test:
             val_losses.append(model.evaluate(x_val, y_val, 2048))
-            # pautomac_perp.append(scores.pautomac_perplexity(pautomac_sol,
-            #                                                 spextractor_common.proba_words_para(model, pautomac_test,
-            #                                                                                     nalpha, False, True)))
-
         if do_test:
             for e in range(i):
                 print("Loss at epoch {0} : {1} on train, {2} on validation".format(e + 1, losses[e], val_losses[e]))
             mini = np.argmin(val_losses, axis=0)
             print("Current best is {0} with {1}".format(mini[0]+1, val_losses[mini[0]]))
             sys.stdout.flush()
-
-            # for e in range(i):
-            #     print("Perplexity at epoch {0} : {1}".format(e+1, pautomac_perp[e]))
-            #     sys.stdout.flush()
         else:
             for e in range(i):
                 print("Loss at epoch {0} : {1} on train".format(e + 1, losses[e]))
                 sys.stdout.flush()
+    return model
 
 
-def nono_layer(t, *args, **kwargs):
+def rnn_layer(t, *args, **kwargs):
+    """
+    Returns a RNN layer, among the Keras layers.
+    :param t: type of layer
+    :param args: args to give to the layer constructor
+    :param kwargs: kwargs to give to the layer constructor
+    :return: a RNN layer.
+    """
     if t == 0:
         return keras.layers.CuDNNLSTM(*args, **kwargs)
     elif t == 1:
@@ -201,5 +252,5 @@ if __name__ == "__main__":
                  .replace(" ", "_")
                  .replace("/", "+"))
     print(modelname)
-    trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg, test_file_arg, layer_arg, mode_arg)
-
+    m = trainf(trainfile_arg, wid_arg, sample_arg, neurons_arg, epochs_arg, batch_arg,
+               test_file_arg, layer_arg, mode_arg)

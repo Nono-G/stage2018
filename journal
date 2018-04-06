@@ -514,7 +514,7 @@ retraiter systématiquement le retour de model.predict(...) en enlevant les colo
 Voire y compris la colonne "symbole début" et renormaliser les valeurs ?
 Au passage découverte d'un bug dans le vieux test.py, le symbole de fin est pour moi nalpha+1, pour
 la fonction d'évaluation par contre c'est -1 !
-Au final imposer des poids égaux s'est plus galère que prévu, ça demande de créer une classe custom
+Au final imposer des poids égaux c'est plus galère que prévu, ça demande de créer une classe custom
 qui hérite de layer, et de faire ses tripatouilles dedans.
 Ou alors il y a peut etre une solution en mettant les doigts profonds dans la prise private, je me
 renseigne dessus.
@@ -525,7 +525,7 @@ poids de la couche. Ah oui en fait c'est normal, cf fonctionnement graph de TF.
 Bon ça aura pris presque toute la journée mais au final c'est enfin réussi, avec l'aide de SA
 les poids de l'embed refletent ceux de la dernière couche de classif. En termes de perfs ça crève
 pas les yeux, a tester plus en profondeur dès que possible.
-Pistes de continuation :
+Pistes de continuation évoquées par SA:
  - Améliorer RNN en lui donnant l'automate comme superviseur.
  - Présenter un automate très compréssé, donc lisible, comme approx (faible) du RNN
  - Montrer que les calculs sont plus rapides sur automates -> IA embarquée, basse conso
@@ -558,20 +558,21 @@ milliers de modèles, ça me semble pas raisonnable.
 En y repensant il était absolument normal que loss et perplexité ne soient pas corrélés, car c'était
 la loss sur le train, qui se sur-apprend. Donc SA me fait calculer la loss sur le même que la perp.
 Une vraie loss, on espère que ça sera corrélé cette fois. C'est pas parfaitement le cas mais c'est
-proche en tout cas (biais sur la quantité tiré aléatoirement ?)
+proche en tout cas (biais sur la quantité tirée aléatoirement ?)
 
 --> S8 : 8+8+(8.5)+(7.5)+3 = 35
 
 Lundi 2 Avril : LUNDI DE PAQUES
 
-Mardi 3 Avril : 11h - 11h30 12h30 13h + maison
+Mardi 3 Avril : 11h - 11h30 12h30 - 13h + maison
 Journée difficile de bosser, mal a la tete, je me perd dans trop d'objectifs.
 Quelques rangements et refactoring dans les tests.
 D'après quelques expériences, il semblerait que la loss de test soit a peu près corrélée au final,
 on va donc laisser tomber la perplexité comme métrique pendant l'apprentissage, comme ça gain de
 temps et plus grande rigueur de la démarche.
+On se fait expulser car visioconférence dans le "bureau".
 
-Mercredi 4 Avril : 9h30 - 18h (ns yerba)
+Mercredi 4 Avril : 9h30 - 17h30 (ns yerba)
 Quelques rangements, passage définitif de parse3 à parse5, élégage des choses inutiles dans parseX.
 On va mettre a plat bien propre le test pour le lancer enfin !
 Arpès quelques préparations, je pense qu'on a de bonne conditions pour faire les tests, je lance sur
@@ -589,16 +590,42 @@ sur quelques (6 pour la première fournée) logs par pb.
 Au fait on a pas guetté une éventuelle meilleure corrélation entre perp et métrique categ_acc.
 Petit bug idiot dans train2, on repart à la case départ et on relance...
 Concernant la différence entre proba_words_2 et proba_words_para, Elle est minime, difficile a
-cerner, elle renvoient des résultats différents pour certains préfixes (qui peuvent être n'importe
+cerner, elles renvoient des résultats différents pour certains préfixes (qui peuvent être n'importe
 quoi, pas de valeur particulière) et ces mêmes préfixes prédits de manière indépendante par le model
-donne raison parfois à l'un, parfois à l'autre. Au vu des mauvaises performances du multithreading,
+donne raison parfois à l'une, parfois à l'autre. Au vu des mauvaises performances du multithreading,
 de la complexité supplémentaire inutile induite par le stockage de préfixes tronqués au padding dans
 proba_words_para, j'ai décidé de détruire proba_words_para. Comme ça pas de doublon qui sème la con-
 fusion.
 Dans la foulée, autres rangements divers.
+Début des éclaircissements sur LaTeX. Overleaf marche mal, on peut créer un compte mais pas de mdp ?
+Amélioration du petit script kill all OAR.
 
-Jeudi 5 Avril :
-Vendredi 6 Avril :
+Jeudi 5 Avril : 9h - 16h (ns yerba)
+Petits problèmes réseaux la première heure.
+Tous les aprrentissages ont terminé, en une nuit. Donc on pourrait se permettre un peu plus de rech-
+erche de bons paramètres pour la fournée suivante.
+Les loss sont toujours dans une fourchette sérrée (+/- 0.01 environ) par contre d'un problème à un
+autre c'est le grand écart, de 0.36 à 2.11 (x5.8).
+Catastrophe, chargement du modèle impossible a cause de la couche custom ! Pourtant j'étais au cou-
+rant du risque, il me semblait l'avoir testé ?
+Du coup on va passer à une méthode type load_weight, et réinstancier des modèles creux, mais c'est
+nettement plus chiant. Ou alors on laisse tomber la couche maison ? je relance sans couche maison
+pour trancher. J'essaye de tirer les poids seuls du fichier de sauvegarde de modèle pour que tout ne
+soit pas a jeter, mais c'est pas promis que ça fonctionne.
+Bon du coup j'ai refait pas mal de trucs autour de train2, fusion des deux programmes, parametre
+pour dire mbed-dbed ou non, sauvegardes et chargements qui vont avec.
+Cluster assez encombré, il faudra être patient.
+Du coup encore un peu de Latex pour m'occuper en attendant. Bon j'ai pas l'impression qu'il y ait
+tant de choses a apprendre a priori, on fera en fonction des besoins lors de la rédaction. 
+Scripts pour gagner du temps en décorticage de données la prochaine fois.
+
+Vendredi 6 Avril : 8h - 12h
+Tout n'as pas eu le temps de finir, certains ont commencé il y a seulement 1h. Mais au moins tout le
+monde est bien lancé, c'est toujours ça de fait. Effectivement la prochaine fois je lancerais aussi
+sur see4c1, il garde bien des core cpus libres pour aller avec les gpus donc pas de pitié.
+Du coup il me faut attendre, laisser le cluster faire, essayer de trouver du temps samedi aprem pour
+lancer la fournée suivante ?
+Du coup matinée commentaires et code propre, c'est toujours utile.
 
 Lundi 9 Avril :
 Mardi 10 Avril :
@@ -618,7 +645,7 @@ Mercredi 25 Avril :
 Jeudi 26 Avril :
 Vendredi 27 Avril :
 
-Lundi 30 Avril : (Maison ?)
+Lundi 30 Avril : (Maison car polo demain ?)
 Mardi 1 Mai : FETE DU TRAVAIL (Polo)
 Mercredi 2 Mai :
 Jeudi 3 Mai :

@@ -1,16 +1,26 @@
+# Libraries
 import threading
 import math
 import random
 import numpy as np
-import parse5 as parse
 import sys
 import keras
-import scores
 import splearn as sp
+# Project :
+import parse5 as parse
+import scores
+
+"""
+Import only file, containing abstract classes, and related classes and functions for spectral extraction
+"""
 
 
-# Classes pour la parrallélisation :
+# Parallelization classes:
 class ParaRowsCols(threading.Thread):
+    """
+    Thread enumerating all possible sequence of a given length, with a given alphabet
+    see 'combinaisons_para()'
+    """
     def __init__(self, nalpha, d,):
         threading.Thread.__init__(self)
         self.words = []
@@ -22,6 +32,10 @@ class ParaRowsCols(threading.Thread):
 
 
 class ParaCombinaisons(threading.Thread):
+    """
+    Thread filling an array column with letters
+    see 'comb4()'
+    """
     def __init__(self, a, r, p, nalpha):
         threading.Thread.__init__(self)
         self.a = a
@@ -34,6 +48,10 @@ class ParaCombinaisons(threading.Thread):
 
 
 class ParaWords(threading.Thread):
+    """
+    Thread enumerating all possible words made of prefix|letter|suffix,
+    with a given letter and given prefixes and suffixes sets
+    """
     def __init__(self, prefixes, suffixes, letter, hush, subthreads=1, print_id=-1, quiet=True):
         threading.Thread.__init__(self)
         self.prefixes = prefixes
@@ -47,7 +65,7 @@ class ParaWords(threading.Thread):
 
     def run(self):
         ws = set()
-        # Auto-parallelization :
+        # recursive parallelization :
         if self.subthreads > 1:
             pr(self.quiet, "\t\tThread letter {0} begin".format(self.letter))
             thrs = []
@@ -104,17 +122,22 @@ class ParaProbas(threading.Thread):
             self.preds[i] = acc
 
 
-# Autres classes :
+# Other classes :
 class Hush:
+    """
+    (Sequence of integers / integers) codec.
+    Warning : this is not a x-based integers to 10-based integers codec, as for instance [0] and [0,0,0] sequences have
+    different encodings.
+    """
     def __init__(self, maxlen, base):
         self.maxlen = maxlen
         self.base = base
         self.nl = []
         self.pows = []
-        self.mise_en_place()
+        self.ready()
         self.maxval = self.encode([base - 1] * maxlen)
 
-    def mise_en_place(self):
+    def ready(self):
         self.pows = [1] * (self.maxlen+1)
         for i in range(1, self.maxlen+1):
             self.pows[i] = self.pows[i-1] * self.base
@@ -150,6 +173,9 @@ class Hush:
 
 
 class Spex:
+    """
+    SPctral EXtractor base abstract class.
+    """
     def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", perp_model="", context=""):
         self.is_ready = False
         # Semi-constants :
@@ -256,15 +282,15 @@ class Spex:
             spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
             # OK on a du a peu près rattraper l'état après fit.
         except ValueError:
-            pr(False, "Erreur rang trop gros pour la longueur des mots")
+            pr(True, "Erreur rang trop gros pour la longueur des mots")
             return None
         pr(self.quiet, "... Done !")
         # Perplexity :
         # sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         if self.perplexity_calc:
-            # Test file
             print("METRICS :")
             extr_aut = spectral_estimator.automaton
+            # Test file
             y_test_extr = [extr_aut.val(w) for w in self.x_test]
             test_extr_perp = scores.pautomac_perplexity(self.y_test, self.fix_probas(y_test_extr))
             rnn_extr_kl = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
@@ -562,13 +588,11 @@ def proba_words_2(model, words, asdict=True, quiet=False, wer=False):
     total = 0
     errors = 0
     pr(quiet, "\tCalculating fullwords probas...")
-    genwords = list()
     # for i in range(len(words)):
     for i, _word in enumerate(words):
         # word = tuple([x for x in words[i]])+(nalpha+1,)
         word = _word + [nalpha+1]
         acc = 1.0
-        genword = list()
         for k in range(len(word)):
             pref = tuple(word[:k])
             proba = prefixes_dict[pref][word[k]]
@@ -663,93 +687,93 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
 # #######
 # Fonctions Conservées pour historique :
 # #######
-def combinaisons(nalpha, dim):
-    s = math.pow(nalpha, dim)
-    a = [[0]*dim]*int(s)
-    a = np.array(a)
-    p = s
-    for i in range(0, dim):
-        p /= nalpha
-        comb4(a, i, p, nalpha)
-    return a
-
-
-def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
-    bsize = 512
-    pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
-    preds = np.empty(len(x_words))
-    # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
-    # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
-    if not quiet:
-        print("\tEncoding words...", end="")
-    batch_words = [([nalpha+1]+[1+elt2 for elt2 in elt]+[nalpha+2])for elt in x_words]
-    if not quiet:
-        print("\r\tEncoding OK                            ",
-              "\n\tPreparing batch :", end="")
-    nbw = len(x_words)
-    batch = []
-    for i in range(nbw):
-        word = batch_words[i]
-        # prefixes :
-        batch += [word[:j] for j in range(1, len(word))]
-        if not quiet:
-            print("\r\tPreparing batch : {0} / {1}".format(i+1, nbw), end="")
-    if not quiet:
-        print("\r\tBatch OK                                 ",
-              "\n\tPadding batch...", end="")
-    # padding :
-    batch = [parse.pad_0(elt, pad) for elt in batch]
-    if not quiet:
-        print("\r\tPadding OK                           ",
-              "\n\tPredicting batch ({0} elts)...".format(len(batch)))
-    # On restructure tout en numpy
-    batch = np.array(batch)
-    # Prédiction :
-    wpreds = model.predict(batch, bsize, verbose=(0 if quiet else 1))
-    if wpreds.shape[1] > nalpha + 2:
-        print("couic la colonne de padding !")
-        wpreds = np.delete(wpreds, 0, axis=1)
-    if not quiet:
-        print("\tPredicting OK\n\tCalculating fullwords probas:", end="")
-    offset = 0
-    for i in range(nbw):
-        word = batch_words[i]
-        acc = 1.0
-        for k in range(len(word)-1):
-            acc *= wpreds[offset][word[k+1]-1]
-            offset += 1
-        preds[i] = acc
-        if not quiet:
-            print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, nbw), end="")
-    if not quiet:
-        print("\r\tCalculating fullwords probas OK                         ")
-    if asdict:  # On retourne un dictionnaire
-        probas = dict()
-        for i in range(len(x_words)):
-            probas[tuple(x_words[i])] = preds[i]
-        return probas
-    else:  # On retourne une liste
-        return preds
-
-
-def countlen(seq, le):
-    k = 0
-    for i in range(len(seq)):
-        if len(seq[i]) > le:
-            k += 1
-    return k
-
-
-def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
-    z = 0
-    n = 0
-    for i in range(len(seq)):
-        if seq[i] < p:
-            seq[i] = f
-            n += 1
-        elif seq[i] == p:
-            seq[i] = f
-            z += 1
-    if not quiet:
-        print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
-    return seq
+# def combinaisons(nalpha, dim):
+#     s = math.pow(nalpha, dim)
+#     a = [[0]*dim]*int(s)
+#     a = np.array(a)
+#     p = s
+#     for i in range(0, dim):
+#         p /= nalpha
+#         comb4(a, i, p, nalpha)
+#     return a
+#
+#
+# def proba_words(model, x_words, nalpha, asdict=True, quiet=False):
+#     bsize = 512
+#     pad = int(model.input.shape[1])  # On déduit de la taille de la couche d'entrée le pad nécéssaire
+#     preds = np.empty(len(x_words))
+#     # Il nous faut ajouter le symbole de début (nalpha) au début et le simbole de fin (nalpha+1) à la fin
+#     # et ajouter 1 a chaque élément pour pouvoir utiliser le zéro comme padding,
+#     if not quiet:
+#         print("\tEncoding words...", end="")
+#     batch_words = [([nalpha+1]+[1+elt2 for elt2 in elt]+[nalpha+2])for elt in x_words]
+#     if not quiet:
+#         print("\r\tEncoding OK                            ",
+#               "\n\tPreparing batch :", end="")
+#     nbw = len(x_words)
+#     batch = []
+#     for i in range(nbw):
+#         word = batch_words[i]
+#         # prefixes :
+#         batch += [word[:j] for j in range(1, len(word))]
+#         if not quiet:
+#             print("\r\tPreparing batch : {0} / {1}".format(i+1, nbw), end="")
+#     if not quiet:
+#         print("\r\tBatch OK                                 ",
+#               "\n\tPadding batch...", end="")
+#     # padding :
+#     batch = [parse.pad_0(elt, pad) for elt in batch]
+#     if not quiet:
+#         print("\r\tPadding OK                           ",
+#               "\n\tPredicting batch ({0} elts)...".format(len(batch)))
+#     # On restructure tout en numpy
+#     batch = np.array(batch)
+#     # Prédiction :
+#     wpreds = model.predict(batch, bsize, verbose=(0 if quiet else 1))
+#     if wpreds.shape[1] > nalpha + 2:
+#         print("couic la colonne de padding !")
+#         wpreds = np.delete(wpreds, 0, axis=1)
+#     if not quiet:
+#         print("\tPredicting OK\n\tCalculating fullwords probas:", end="")
+#     offset = 0
+#     for i in range(nbw):
+#         word = batch_words[i]
+#         acc = 1.0
+#         for k in range(len(word)-1):
+#             acc *= wpreds[offset][word[k+1]-1]
+#             offset += 1
+#         preds[i] = acc
+#         if not quiet:
+#             print("\r\tCalculating fullwords probas : {0} / {1}".format(i+1, nbw), end="")
+#     if not quiet:
+#         print("\r\tCalculating fullwords probas OK                         ")
+#     if asdict:  # On retourne un dictionnaire
+#         probas = dict()
+#         for i in range(len(x_words)):
+#             probas[tuple(x_words[i])] = preds[i]
+#         return probas
+#     else:  # On retourne une liste
+#         return preds
+#
+#
+# def countlen(seq, le):
+#     k = 0
+#     for i in range(len(seq)):
+#         if len(seq[i]) > le:
+#             k += 1
+#     return k
+#
+#
+# def fix_probas(seq, p=0.0, f=0.0001, quiet=False):
+#     z = 0
+#     n = 0
+#     for i in range(len(seq)):
+#         if seq[i] < p:
+#             seq[i] = f
+#             n += 1
+#         elif seq[i] == p:
+#             seq[i] = f
+#             z += 1
+#     if not quiet:
+#         print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
+#     return seq
