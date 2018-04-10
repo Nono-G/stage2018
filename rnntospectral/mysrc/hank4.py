@@ -10,8 +10,8 @@ class SpexExpress(SpexHush):
     Spex "Express" : lrows=lcols = un entier, et tout est "plein" dans l'ensemble des mots
     """
 
-    def __init__(self, modelfile, lrows_lcols, perp_train="", perp_targ="", perp_mod="", context=""):
-        SpexHush.__init__(self, modelfile, lrows_lcols, lrows_lcols, perp_train, perp_targ, perp_mod, context)
+    def __init__(self, modelfilestring, lrows_lcols, perp_train="", perp_targ="", perp_mod="", context=""):
+        SpexHush.__init__(self, modelfilestring, lrows_lcols, lrows_lcols, perp_train, perp_targ, perp_mod, context)
 
     def gen_words(self):
         lig_col = []

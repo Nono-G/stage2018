@@ -4,11 +4,12 @@ import math
 import random
 import numpy as np
 import sys
-import keras
 import splearn as sp
 # Project :
 import parse5 as parse
 import scores
+import train2f
+import wa_distance
 
 """
 Import only file, containing abstract classes, and related classes and functions for spectral extraction
@@ -176,7 +177,7 @@ class Spex:
     """
     SPctral EXtractor base abstract class.
     """
-    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", perp_model="", context=""):
+    def __init__(self, modelfilestring, lrows, lcols, perp_train="", perp_targ="", perp_model="", context=""):
         self.is_ready = False
         # Semi-constants :
         self.quiet = False
@@ -186,7 +187,7 @@ class Spex:
         self.randwords_maxlen = 70
         self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
         # Arguments :
-        self.rnn_model = keras.models.load_model(modelfile)
+        self.rnn_model = train2f.my_load_model(*(modelfilestring.split()))
         self.lrows = lrows
         self.lcols = lcols
         self.perplexity_train = perp_train
@@ -194,7 +195,12 @@ class Spex:
         self.perplexity_model = perp_model
         self.context = context
         # Attributes derived from arguments :
-        self.nalpha = int(self.rnn_model.layers[0].input_dim) - 3
+        try:
+            # "mode 0"
+            self.nalpha = int(self.rnn_model.layers[0].input_dim) - 3
+        except AttributeError:
+            # "mode 1", with custom embedding
+            self.nalpha = int(self.rnn_model.layers[1].input_dim) - 3
         self.pad = int(self.rnn_model.input.shape[1])
         self.perplexity_calc = (perp_train != "" and perp_targ != "" and perp_model != "")
         # Computed attributes
@@ -203,11 +209,14 @@ class Spex:
         self.words = None
         self.words_probas = None
         self.lhankels = None
-        # Perplexity calculations attributes
+        # metrics calculations attributes
+        self.true_automaton = None
         #       Test sample :
         self.x_test = None
         self.y_test = None
         self.y_test_rnn = None
+        self.test_y_prefixes_rnn = None
+        self.test_y_prefixes_aut = None
         self.test_self_perp = None
         self.test_rnn_perp = None
         self.test_rnn_kl = None
@@ -216,14 +225,12 @@ class Spex:
         self.test_rnn_ndcg1 = None
         self.test_rnn_ndcg5 = None
         #       Random generated words :
-        self.true_automaton = None
         self.x_rand = None
         self.y_rand = None
         self.y_rand_rnn = None
         self.rand_self_perp = None  # rand sample self perplexity
         self.rand_rnn_perp = None  # rnn perplexity on rand
         self.test_rnn_kl_rand = None  # kl div between model and rnn on rand sample
-        self.rnn_words = None
         #       RNN Generated words:
         self.x_rnnw = None
         self.rnnw_rnn_wer = None
@@ -235,16 +242,19 @@ class Spex:
             #  Test sample :
             self.x_test = parse.parse_fullwords(self.perplexity_train)
             self.y_test = parse.parse_pautomac_results(self.perplexity_target)
-            self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True)
+            self.test_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
+            self.test_y_prefixes_aut = proba_all_prefixes_aut(self.true_automaton, self.x_test)
+            self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True, dic=self.test_y_prefixes_rnn)
             self.test_rnn_wer = e/t
             t, e = scores.wer_aut(self.true_automaton, self.x_test)
             self.test_self_wer = e/t
-
             self.test_self_perp = scores.pautomac_perplexity(self.y_test, self.y_test)
             self.test_rnn_perp = scores.pautomac_perplexity(self.y_test, self.y_test_rnn)
             self.test_rnn_kl = scores.kullback_leibler(self.y_test, self.y_test_rnn)
-            self.test_rnn_ndcg1 = scores.faster_ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1)
-            self.test_rnn_ndcg5 = scores.faster_ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5)
+            self.test_rnn_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1,
+                                              dic_ref=self.test_y_prefixes_aut, dic_approx=self.test_y_prefixes_rnn)
+            self.test_rnn_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5,
+                                              dic_ref=self.test_y_prefixes_aut, dic_approx=self.test_y_prefixes_rnn)
             #  Random generated words :
             self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
             # noinspection PyTypeChecker
@@ -285,7 +295,7 @@ class Spex:
             pr(True, "Erreur rang trop gros pour la longueur des mots")
             return None
         pr(self.quiet, "... Done !")
-        # Perplexity :
+        # Metrics :
         # sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         if self.perplexity_calc:
             print("METRICS :")
@@ -295,12 +305,22 @@ class Spex:
             test_extr_perp = scores.pautomac_perplexity(self.y_test, self.fix_probas(y_test_extr))
             rnn_extr_kl = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
             test_extr_kl = scores.kullback_leibler(self.y_test, self.fix_probas(y_test_extr))
-            test_rnn_extr_ndcg1 = scores.faster_ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1)
-            test_model_extr_ndcg1 = scores.faster_ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1)
-            rnnw_rnn_extr_ndcg1 = scores.faster_ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1)
-            test_rnn_extr_ndcg5 = scores.faster_ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5)
-            test_model_extr_ndcg5 = scores.faster_ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5)
-            rnnw_rnn_extr_ndcg5 = scores.faster_ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5)
+            test_y_prefixes_extr = proba_all_prefixes_aut(extr_aut, self.x_test)
+            test_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
+            rnnw_y_prefixes_extr = proba_all_prefixes_aut(extr_aut, self.x_rnnw)
+            rnnw_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True)
+            test_rnn_extr_ndcg1 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1,
+                                              dic_ref=test_y_prefixes_rnn, dic_approx=test_y_prefixes_extr)
+            test_model_extr_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1,
+                                                dic_ref=self.test_y_prefixes_aut, dic_approx=test_y_prefixes_extr)
+            rnnw_rnn_extr_ndcg1 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1,
+                                              dic_ref=rnnw_y_prefixes_rnn, dic_approx=rnnw_y_prefixes_extr)
+            test_rnn_extr_ndcg5 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5,
+                                              dic_ref=test_y_prefixes_rnn, dic_approx=test_y_prefixes_extr)
+            test_model_extr_ndcg5 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5,
+                                                dic_ref=self.test_y_prefixes_aut, dic_approx=test_y_prefixes_extr)
+            rnnw_rnn_extr_ndcg5 = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5,
+                                              dic_ref=rnnw_y_prefixes_rnn, dic_approx=rnnw_y_prefixes_extr)
             # Random words
             # y_rand_extr = self.fix_probas(spectral_estimator.predict(self.x_rand_spf))
             y_rand_extr = [extr_aut.val(w) for w in self.x_rand]
@@ -385,15 +405,15 @@ class Spex:
             print("\tNDCG:5 on RNN-generated words :")
             print("\t\t********\tRNN-Extr :\t{0}\n"
                   .format(rnnw_rnn_extr_ndcg5))
-
+            print(wa_distance.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian"))
         #
         return spectral_estimator
 
     def hankels(self):
         return []
 
-    def proba_words_normal(self, words, asdict=True, wer=False):
-        return proba_words_2(self.rnn_model, words, asdict, self.quiet, wer)
+    def proba_words_normal(self, words, asdict=True, wer=False, dic=None):
+        return proba_words_2(self.rnn_model, words, asdict, self.quiet, wer, prefixes_dict=dic)
 
     def proba_words_special(self, words, asdict=True):
         return self.proba_words_normal(words, asdict)
@@ -431,8 +451,8 @@ class Spex:
 
 # SpexHush correspond a Hank3 et Hank4, ceux qui utilisent Hush
 class SpexHush(Spex):
-    def __init__(self, modelfile, lrows, lcols, perp_train="", perp_targ="", perp_mod="", context=""):
-        Spex.__init__(self, modelfile, lrows, lcols, perp_train, perp_targ, perp_mod, context)
+    def __init__(self, modelfilestring, lrows, lcols, perp_train="", perp_targ="", perp_mod="", context=""):
+        Spex.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, perp_mod, context)
         if type(lrows) is int:
             x = lrows
         else:
@@ -547,15 +567,28 @@ def proba_all_prefixes_rnn(model, words, quiet=False, del_start_symb=False):
 
 
 def proba_all_prefixes_aut(model, words):
+    nalpha = model.nbL
+    big_a = np.zeros((model.nbS, model.nbS))
+    for t in model.transitions:
+        big_a = np.add(big_a, t)
+    alpha_tilda_inf = np.subtract(np.identity(model.nbS), big_a)
+    alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    alpha_tilda_inf = np.dot(alpha_tilda_inf, model.final)
     prefixes = set()
     for w in words:
         for i in range(len(w)):
             prefixes.add(tuple(w[:i]))
     prefixes = list(prefixes)
-    predictions = [proba_next_aut(model, p) for p in prefixes]
     prefixes_dict = dict()
     for i in range(len(prefixes)):
-        prefixes_dict[prefixes[i]] = predictions[i]
+        u = model.initial
+        for l in prefixes[i]:
+            u = np.dot(u, model.transitions[l])
+        probas = np.empty(nalpha + 1)
+        for symb in range(nalpha):
+            probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
+        probas[nalpha] = np.dot(u, model.final)
+        prefixes_dict[prefixes[i]] = probas
     return prefixes_dict
 
 
@@ -577,21 +610,19 @@ def proba_next_aut(aut, prefix):
     return probas
 
 
-def proba_words_2(model, words, asdict=True, quiet=False, wer=False):
-    try:
-        nalpha = int(model.layers[0].input_dim) - 3
-    except AttributeError:
-        nalpha = int(model.layers[1].input_dim) - 3
-    prefixes_dict = proba_all_prefixes_rnn(model, words, quiet)
+def proba_words_2(model, words, asdict=True, quiet=False, wer=False, prefixes_dict=None):
+    if prefixes_dict is None:
+        prefixes_dict = proba_all_prefixes_rnn(model, words, quiet)
     # Calcul de la probabilité des mots :
     preds = np.empty(len(words))
     total = 0
     errors = 0
     pr(quiet, "\tCalculating fullwords probas...")
     # for i in range(len(words)):
+    end_symb_index = len(prefixes_dict[tuple()])-1
     for i, _word in enumerate(words):
         # word = tuple([x for x in words[i]])+(nalpha+1,)
-        word = _word + [nalpha+1]
+        word = _word + [end_symb_index]
         acc = 1.0
         for k in range(len(word)):
             pref = tuple(word[:k])
@@ -663,7 +694,7 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
                 except KeyError:
                     probas = model.predict(np.array([enc_word]))
                     if probas.shape[1] > nalpha + 2:
-                        print("couic la colonne de padding !")
+                        # print("couic la colonne de padding !")
                         probas = np.delete(probas, 0, axis=1)
                     dico[tuple(enc_word)] = probas
                 r = random.random()

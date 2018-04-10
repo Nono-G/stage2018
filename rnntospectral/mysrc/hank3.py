@@ -6,8 +6,8 @@ import time
 
 
 class SpexRandDrop(SpexHush):
-    def __init__(self, modelfile, lrows, lcols, pref_drop, suff_drop, perp_train="", perp_targ="", context=""):
-        SpexHush.__init__(self, modelfile, lrows, lcols, perp_train, perp_targ, context)
+    def __init__(self, modelfilestring, lrows, lcols, pref_drop, suff_drop, perp_train="", perp_targ="", context=""):
+        SpexHush.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, context)
         self.pref_drop = pref_drop
         self.suff_drop = suff_drop
         self.batch_nb_threads = 4

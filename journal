@@ -627,8 +627,31 @@ Du coup il me faut attendre, laisser le cluster faire, essayer de trouver du tem
 lancer la fournée suivante ?
 Du coup matinée commentaires et code propre, c'est toujours utile.
 
-Lundi 9 Avril :
-Mardi 10 Avril :
+---> S9 :
+
+Lundi 9 Avril : 13h20 - 18h10
+Arrivée un peu plus tard que prévu, en voiture.
+Mail de Guillaume Rabusseau transmis par RE avec théorie et implé efficace de dist l2 entre automs.
+Résultats exprériences apprentissages : Dbed prouve (enfin) son utilité : dans certains cas (minori-
+té) ça diminue un petit peu, dans les autres ça améliore assez nettement. Donc la version sans sera
+abandonnée pour la suite. Les loss sont toujours dans une fourchette assez sérrée pour un pb donné.
+Et assez variable d'un pb a un autre. C'est normal d'après RE, c'est fait exprès qu'il y ait des pbs
+faciles et difficiles.
+Essais d'extractions a partir des modèles appris, pour vérifier que tout soit bon avant de lancer la
+suite des apprentissages : malheureusement nombreux petits bugs et désagréments (temps looooooong)
+intruoduits pas les modifs récentes ? corrections et perfectionnements. Encore plus bizarre, un bug
+quand j'exécute dans le terminal, mais pas dans le debugger PyCharm ?!
+Non c'est bon j'ai trouvé, c'était ma faute, et c'était très con.
+
+Mardi 10 Avril : 9h - 11h30
+Les apprentissages suivent leur cours, a 9h50, 84 sur 228 ont fini.
+Je vais essayer de plus utiliser les dicos autour de ndcg et autres pour accélérer les calculs.
+Gains de temps, mais usage de mémoire (mais bon c'est sur les ensemble de test donc c'est fixe et
+d'un ordre de grandeur raisonnable). Je pense que c'est une bonne chose.
+Je rajoute le calcul de dist l2 entre automates fourni par GR. Du coup c'est seulement entre vrai
+automate et automate extrait, par contre quel résultat est bon ? maauvais ? je manque de comparaison
+Dans l'article cité, seulement aspects théoriques.
+
 Mercredi 11 Avril :
 Jeudi 12 Avril :
 Vendredi 13 Avril : (sncf)

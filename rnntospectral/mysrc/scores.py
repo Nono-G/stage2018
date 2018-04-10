@@ -1,29 +1,36 @@
+# External
 import math
 import numpy as np
-# import parse3 as parse
+# Project
 from parse5 import best_n_args
 import spextractor_common
 
 
-def find_proba(letter, target):
-    for i in range(len(target)):
-        if target[i] == letter:
-            return float(target[i + 1])
-    return 0
+"""
+Import-only file. Contains scores computations functions : WER, NDCG, KL-Div, Perplexity
+"""
 
 
 def spice_score(rankings, targets_file):
-    # final_score = -1000
+    """
+    Copied from SPiCe archives. Compute NDCG5 score, using a target file provided in SPiCe data.
+    :param rankings: Ranking proposals, sequence of letters
+    :param targets_file: name of SPiCe target file
+    :return: NDCG5 computed on the rankings, using the reference target file.
+    """
+    def find_proba(letter, _t):
+        for j in range(len(_t)):
+            if _t[j] == letter:
+                return float(_t[j + 1])
+        return 0
+
     with open(targets_file, "r") as t:
         score = 0
         nb_prefixes = 0
         i = 0
         for ts in t.readlines():
             nb_prefixes += 1
-            # rs = r.readline()
             target = ts.split()
-            # ranking = string.split(rs)
-
             denominator = float(target[0])
             prefix_score = 0
             k = 1
@@ -40,8 +47,6 @@ def spice_score(rankings, targets_file):
                 k += 1
                 if k > 5:
                     break
-            # print(nb_prefixes, su)
-            # print(rankings[i], "\t" + str(prefix_score) + "\t" + ts[:-1])
             score += prefix_score / denominator
             i += 1
         final_score = score / nb_prefixes
@@ -49,6 +54,12 @@ def spice_score(rankings, targets_file):
 
 
 def pautomac_perplexity(y, predict_prob):
+    """
+    Partly copied from splearn.Spectral.score()
+    :param y:
+    :param predict_prob:
+    :return:
+    """
     s_a = sum(predict_prob)
     s_c = sum(y)
     s = 0
@@ -114,7 +125,7 @@ def wer_aut(aut, input_words, expected_words=None):
 
 
 # Attention a ce que ncdcg_l soit <= la longueur de l'alphabet
-def faster_ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
+def ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
     if dic_ref is None:
         try:
             dic_ref = spextractor_common.proba_all_prefixes_rnn(ref, words, del_start_symb=True)
@@ -146,7 +157,7 @@ def faster_ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
 
 
 def ndcg5(words, ref, approx):
-    return faster_ndcg(words, ref, approx, ndcg_l=5)
+    return ndcg(words, ref, approx, ndcg_l=5)
 
 # Remplacé par faster_ndcg depuis
 # Attention a ce que ncdcg_l soit <= la longueur de l'alphabet
