@@ -13,6 +13,7 @@ class SpexExpress(SpexHush):
     def __init__(self, modelfilestring, lrows_lcols, perp_train="", perp_targ="", perp_mod="", context=""):
         SpexHush.__init__(self, modelfilestring, lrows_lcols, lrows_lcols, perp_train, perp_targ, perp_mod, context)
 
+    # TODO : Replace threading by multiprpocessing here
     def gen_words(self):
         lig_col = []
         thrs = []
@@ -44,7 +45,6 @@ class SpexExpress(SpexHush):
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
         suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         if suffs_preds.shape[1] > self.nalpha + 2:
-            print("couic la colonne de padding !")
             suffs_preds = np.delete(suffs_preds, 0, axis=1)
         pr(self.quiet, "\tCalcul de la probabilite des mots entiers...")
         preds = np.empty(len(words))
@@ -65,9 +65,10 @@ class SpexExpress(SpexHush):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4 or len(sys.argv) > 6:
-        print("Usage   : {0} modelfile ranks lrows [testfile testtargetsfile]".format(sys.argv[0]))
-        print("Exemple : {0} modelRNN1.h5py 6_10_20 3 5.pautomac.test 5.pautomac_solutions.txt".format(sys.argv[0]))
+    if len(sys.argv) < 4 or len(sys.argv) > 7:
+        print("Usage   : {0} modelfile ranks lrows [testfile testtargetsfile testmodel]".format(sys.argv[0]))
+        print("Example : {0} modelRNN1.h5py 6_10_20 3 5.pautomac.test 5.pautomac_solutions.txt 5.pautomac_model.txt"
+              .format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
     context_a = (sys.argv[1] + "r" + sys.argv[2] + "l" + sys.argv[3]).replace(" ", "_").replace("/", "+")
@@ -75,19 +76,16 @@ if __name__ == "__main__":
     arg_model = sys.argv[1]
     arg_ranks = [int(e) for e in sys.argv[2].split(sep="_")]
     arg_lrows_lcols = int(sys.argv[3])
-    if len(sys.argv) >= 6:
+    if len(sys.argv) >= 7:
         arg_testfile = sys.argv[4]
         arg_testtargetsfile = sys.argv[5]
-        arg_perp = True
+        arg_aut_model = sys.argv[6]
     else:
         arg_testfile = ""
         arg_testtargetsfile = ""
-        arg_perp = False
+        arg_aut_model = ""
 
-    arg_aut_model = arg_testtargetsfile.split(sep="_")[0]+"_model.txt"
     spex = SpexExpress(arg_model, arg_lrows_lcols, arg_testfile, arg_testtargetsfile, arg_aut_model, context_a)
-    spex.ready()
-
     for rank in arg_ranks:
         est = spex.extr(rank)
         # sp.Automaton.write(est.automaton, filename=("aut-{0}-{1}".format(context_a, rank)))

@@ -62,7 +62,7 @@ class ParaWords(threading.Thread):
         self.subthreads = subthreads
         self.quiet = quiet
         self.id = print_id
-        self.h = hush
+        self.h = hush.get_copy()
 
     def run(self):
         ws = set()
@@ -84,7 +84,7 @@ class ParaWords(threading.Thread):
             pr(self.quiet, "\t\t\tThread letter {0}, part {1} begin".format(self.letter, self.id))
             for p in self.prefixes:
                 for s in self.suffixes:
-                    w = self.h.encode(p + self.letter + s)
+                    w = self.h.encode(self.h.decode((p, self.letter, s)))
                     ws.add(w)
             pr(self.quiet, "\t\t\tThread letter {0}, part {1} end".format(self.letter, self.id))
         # Anyway :
@@ -96,7 +96,8 @@ class ParaBatchHush(threading.Thread):
         threading.Thread.__init__(self)
         self.words = words
         self.preffixes_set = set()
-        self.hush = hush
+        self.hush = hush.get_copy()
+        # self.hush = hush
 
     def run(self):
         for wcode in self.words:
@@ -117,9 +118,11 @@ class ParaProbas(threading.Thread):
     def run(self):
         for i in range(len(self.words)):
             word = self.hush.decode(self.words[i]) + [self.nalpha + 1]
+            pcode = sorted(list(self.hush.prefixes_codes(self.words[i]))) + [self.words[i]]
             acc = 1.0
             for k in range(len(word)):
-                acc *= self.dict[self.hush.encode(word[:k])][word[k]]
+                # acc *= self.dict[self.hush.encode(word[:k])][word[k]]
+                acc *= self.dict[pcode[k]][word[k]]
             self.preds[i] = acc
 
 
@@ -131,7 +134,7 @@ class Hush:
     different encodings.
     """
     def __init__(self, maxlen, base):
-        self.maxlen = maxlen
+        self.maxlen = max(2, maxlen)
         self.base = base
         self.nl = []
         self.pows = []
@@ -148,8 +151,21 @@ class Hush:
             self.nl[i] = self.nl[i-1] + (self.pows[i])
         #
 
+    def get_copy(self):
+        h = Hush(self.maxlen, self.maxval)
+        return h
+
+    def words_of_len(self, le):
+        if le == 0:
+            return range(1)
+        else:
+            r = range(self.nl[le - 1], self.nl[le])
+            return r
+            # return [i for i in r]
+
     def encode(self, w):
         if len(w) > self.maxlen:
+            print(w)
             raise ValueError
         if len(w) == 0:
             return 0
@@ -159,7 +175,16 @@ class Hush:
                 x += w[i]*self.pows[len(w)-i-1]
             return x
 
-    def decode(self, n):
+    def decode(self, s):
+        if isinstance(s, tuple):
+            r = []
+            for x in s:
+                r += self.decode(x)
+            return r
+        else:
+            return self._decode(s)
+
+    def _decode(self, n):
         if n > self.maxval:
             raise ValueError
         le = 0
@@ -171,6 +196,35 @@ class Hush:
             x[le-i-1] = reste % self.base
             reste //= self.base
         return x
+
+    def prefix_code(self, x):
+        if x >= self.nl[1]:
+            i = 0
+            while i < self.maxlen and self.nl[i] <= x:
+                i += 1
+            i -= 1
+            d = (x - self.nl[i]) // self.base
+            return self.nl[i-1]+d
+        else:
+            return 0
+
+    def prefixes_codes(self, x):
+        r = set()
+        c = x
+        i = 0
+        while i < self.maxlen and self.nl[i] <= c:
+            i += 1
+        i -= 1
+        while i > 0:
+            d = (c - self.nl[i]) // self.base
+            c = self.nl[i-1]+d
+            r.add(c)
+            i -= 1
+        r.add(0)
+        return r
+
+    def concat_code(self, tup):
+        return self.encode(self.decode(tup))
 
 
 class Spex:
@@ -185,7 +239,7 @@ class Spex:
         self.batch_vol = 2048
         self.randwords_minlen = 0
         self.randwords_maxlen = 70
-        self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
+        self.randwords_nb = 100  # Attention risque de boucle infinie si trop de mots !
         # Arguments :
         self.rnn_model = train2f.my_load_model(*(modelfilestring.split()))
         self.lrows = lrows
@@ -298,7 +352,7 @@ class Spex:
         # Metrics :
         # sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         if self.perplexity_calc:
-            print("METRICS :")
+            print("Metrics for rank {0} :".format(rank))
             extr_aut = spectral_estimator.automaton
             # Test file
             y_test_extr = [extr_aut.val(w) for w in self.x_test]
@@ -306,9 +360,9 @@ class Spex:
             rnn_extr_kl = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
             test_extr_kl = scores.kullback_leibler(self.y_test, self.fix_probas(y_test_extr))
             test_y_prefixes_extr = proba_all_prefixes_aut(extr_aut, self.x_test)
-            test_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
+            test_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True, quiet=True)
             rnnw_y_prefixes_extr = proba_all_prefixes_aut(extr_aut, self.x_rnnw)
-            rnnw_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True)
+            rnnw_y_prefixes_rnn = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True, quiet=True)
             test_rnn_extr_ndcg1 = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1,
                                               dic_ref=test_y_prefixes_rnn, dic_approx=test_y_prefixes_extr)
             test_model_extr_ndcg1 = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1,
@@ -343,24 +397,26 @@ class Spex:
             eps_kl_rand_model_extr = neg_zero(y_rand_extr, self.y_rand)
             eps_kl_rand_rnn_extr = len([x for x in y_rand_extr if x <= 0.0])/len(y_rand_extr)
 
+            l2_dist_aut_extr = wa_distance.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
+
             print("\tPerplexity on test file : ")
             print("\t\t********\tTest :\t{0}\n"
                   "\t\t********\tRNN :\t{1}\n"
-                  "\t\t({2:5.2f}%)\tExtr :\t{3}\n"
+                  "\t\t({2:5.2f}%)\tExtr :\t{3}"
                   .format(self.test_self_perp,
                           self.test_rnn_perp,
                           100*eps_pepr_test_target_extr, test_extr_perp))
             print("\tPerplexity on random words : ")
             print("\t\t({0:5.2f}%)\tRand :\t{1}\n"
                   "\t\t********\tRNN :\t{2}\n"
-                  "\t\t({3:5.2f}%)\tExtr :\t{4}\n"
+                  "\t\t({3:5.2f}%)\tExtr :\t{4}"
                   .format(100*eps_perp_rand_selfmodel, self.rand_self_perp,
                           self.rand_rnn_perp,
                           100*eps_perp_rand_model_extr, rand_extr_perp))
             print("\tKL Divergence on test file : ")
             print("\t\t******** \tTest-RNN :\t{0}\n"
                   "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
-                  "\t\t({3:5.2f}%)\tTest-Extr :\t{4}\n"
+                  "\t\t({3:5.2f}%)\tTest-Extr :\t{4}"
                   .format(self.test_rnn_kl,
                           100*eps_kl_test_modelrnn_extr, rnn_extr_kl,
                           100*eps_kl_test_modelrnn_extr, test_extr_kl))
@@ -368,7 +424,7 @@ class Spex:
             print("\t\t********\tModel-RNN :\t{0}\n"
                   "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
                   "\t\t********\tExtr-RNN :\t{3}\n"
-                  "\t\t({4:5.2f}%)\tModel-Extr :\t{5}\n"
+                  "\t\t({4:5.2f}%)\tModel-Extr :\t{5}"
                   .format(self.test_rnn_kl_rand,
                           100*eps_kl_rand_rnn_extr, rnn_extr_kl_rand,
                           extr_rnn_kl_rand,
@@ -376,36 +432,38 @@ class Spex:
             print("\t(1-WER) Accuracy Rate on test file :")
             print("\t\t********\tModel :\t{0}\n"
                   "\t\t********\tRNN :\t{1}\n"
-                  "\t\t********\tExtr :\t{2}\n"
+                  "\t\t********\tExtr :\t{2}"
                   .format(1-self.test_self_wer,
                           1-self.test_rnn_wer,
                           1-test_extr_wer))
             print("\t(1-WER) Accuracy Rate on RNN-generated words :")
             print("\t\t********\tRNN :\t{0}\n"
-                  "\t\t********\tExtr :\t{1}\n"
+                  "\t\t********\tExtr :\t{1}"
                   .format(1-self.rnnw_rnn_wer,
                           1-rnnw_extr_wer))
             print("\tNDCG:1 on test file :")
             print("\t\t********\tModel-RNN :\t{0}\n"
                   "\t\t********\tRNN-Extr :\t{1}\n"
-                  "\t\t********\tModel-Extr :\t{2}\n"
+                  "\t\t********\tModel-Extr :\t{2}"
                   .format(self.test_rnn_ndcg1,
                           test_rnn_extr_ndcg1,
                           test_model_extr_ndcg1))
             print("\tNDCG:1 on RNN-generated words :")
-            print("\t\t********\tRNN-Extr :\t{0}\n"
+            print("\t\t********\tRNN-Extr :\t{0}"
                   .format(rnnw_rnn_extr_ndcg1))
             print("\tNDCG:5 on test file :")
             print("\t\t********\tModel-RNN :\t{0}\n"
                   "\t\t********\tRNN-Extr :\t{1}\n"
-                  "\t\t********\tModel-Extr :\t{2}\n"
+                  "\t\t********\tModel-Extr :\t{2}"
                   .format(self.test_rnn_ndcg5,
                           test_rnn_extr_ndcg5,
                           test_model_extr_ndcg5))
             print("\tNDCG:5 on RNN-generated words :")
-            print("\t\t********\tRNN-Extr :\t{0}\n"
+            print("\t\t********\tRNN-Extr :\t{0}"
                   .format(rnnw_rnn_extr_ndcg5))
-            print(wa_distance.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian"))
+            print("\tl2-dist :")
+            print("\t\t********\tModel-Extr :\t{0}"
+                  .format(l2_dist_aut_extr))
         #
         return spectral_estimator
 
@@ -463,17 +521,6 @@ class SpexHush(Spex):
             y = max(lcols)
         self.hush = Hush(x+y+1, self.nalpha)
 
-    def hankels(self):
-        lhankels = [np.zeros((len(self.prefixes), len(self.suffixes))) for _ in range(self.nalpha + 1)]
-        # EPSILON AND LETTER MATRICES :
-        letters = [[]] + [[i] for i in range(self.nalpha)]
-        for letter in range(len(letters)):
-            for l in range(len(self.prefixes)):
-                for c in range(len(self.suffixes)):
-                    p = self.words_probas[self.hush.encode(self.prefixes[l] + letters[letter] + self.suffixes[c])]
-                    lhankels[letter][l][c] = p
-        return lhankels
-
     def gen_batch_decoded(self, word_list, batch_vol=1):
         current_v = 0
         batch = []
@@ -490,6 +537,17 @@ class SpexHush(Spex):
                 yield ret
         if len(batch) > 0:
             yield np.array(batch)
+
+    def hankels(self):
+        lhankels = [np.zeros((len(self.prefixes), len(self.suffixes))) for _ in range(self.nalpha + 1)]
+        # EPSILON AND LETTER MATRICES :
+        letters = [[]] + [[i] for i in range(self.nalpha)]
+        for letter in range(len(letters)):
+            for l in range(len(self.prefixes)):
+                for c in range(len(self.suffixes)):
+                    p = self.words_probas[self.hush.encode(self.prefixes[l] + letters[letter] + self.suffixes[c])]
+                    lhankels[letter][l][c] = p
+        return lhankels
 
 
 # #######

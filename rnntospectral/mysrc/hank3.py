@@ -1,16 +1,23 @@
+# Libraries :
 import math
 import sys
-import numpy as np
-from spextractor_common import ParaRowsCols, ParaWords, ParaBatchHush, pr, SpexHush, parts_of_list, ParaProbas
+import random
 import time
+import numpy as np
+import multiprocessing
+import os
+# Project :
+from spextractor_common import ParaRowsCols, ParaWords, ParaBatchHush, pr, SpexHush, parts_of_list, ParaProbas, Hush
 
 
 class SpexRandDrop(SpexHush):
-    def __init__(self, modelfilestring, lrows, lcols, pref_drop, suff_drop, perp_train="", perp_targ="", context=""):
-        SpexHush.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, context)
+    def __init__(self, modelfilestring, lrows, lcols, pref_drop,
+                 suff_drop, perp_train="", perp_targ="", met_model="", context=""):
+        SpexHush.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, met_model, context)
         self.pref_drop = pref_drop
         self.suff_drop = suff_drop
-        self.batch_nb_threads = 4
+        self.nb_proc = len(os.sched_getaffinity(0))
+        self.patience = 250
 
     def gen_words(self):
         if not type(self.lrows) is list:
@@ -28,86 +35,74 @@ class SpexRandDrop(SpexHush):
 
     def rand_p_closed(self, words, targ_coeff):
         prefs_set = set()
-        shufflek = np.random.choice(len(words), len(words), replace=False)
-        i = 0
-        while len(prefs_set) < len(words)*targ_coeff:
-            word = words[shufflek[i]]
-            for k in range(len(word)+1):
-                prefs_set.add(tuple(word[:k]))
-            i += 1
-        coeff = len(prefs_set)/len(words)
-        pr(self.quiet, "\t\tP-closure checked, real coeff = {0}".format(coeff))
-        return [list(elt) for elt in prefs_set]
+        index_set = set()
+        miss = 0
+        if targ_coeff > 1.0:
+            target = targ_coeff
+            tarfun = lambda x, y: x
+        else:
+            target = len(words)*targ_coeff
+            tarfun = lambda x, y: y
+        while (tarfun(len(prefs_set), len(index_set)) < target) and miss < self.patience:
+            key = random.randrange(0, len(words))
+            if key not in index_set:
+                index_set.add(key)
+                miss = 0
+                prefs_set.add(words[key])
+                prefs_set.update(self.hush.prefixes_codes(words[key]))
+            else:
+                miss += 1
+        coeff = len(index_set)/len(words)
+        if miss == self.patience:
+            pr(self.quiet, "\t\tRun out of patience !")
+        pr(self.quiet, "\t\tP-closure checked, nb of elements = {0}, real coeff = {1}".format(len(prefs_set), coeff))
+        return list(prefs_set)
 
     def gen_words_indexes_as_lists_para(self):
-        lig = []
-        col = []
-        thrs = []
-        # CREER LES THREADS ET LES LANCER
-        dims = [x for x in (set(self.lrows).union(set(self.lcols)))]
-        dimdict = {}
-        pr(self.quiet, "\tThreads lignes et colonnes...")
-        for d in dims:
-            th = ParaRowsCols(self.nalpha, d)
-            thrs.append(th)
-            th.start()
-        # ATTENDRE LES THREADS ET RECUPERER LES RESULTATS
-        pr(self.quiet, "\tRecuperations lignes et colonnes...")
-        for th in thrs:
-            th.join()
-            dimdict[th.d] = th.words
-        # FORMER lig et col:
-        for d in self.lrows:
-            lig += dimdict[d]
-        for d in self.lcols:
-            col += dimdict[d]
-        # DEL:
-        del thrs
-        del dims
-        del dimdict
+        lig = RangeUnion([self.hush.words_of_len(x) for x in self.lrows])
+        col = RangeUnion([self.hush.words_of_len(x) for x in self.lcols])
         # Y'a pas la place pour tout le monde :
         pr(self.quiet, "\tP-closures...")
-        col = self.rand_p_closed(col, self.pref_drop)
         lig = self.rand_p_closed(lig, self.suff_drop)
+        col = self.rand_p_closed(col, self.pref_drop)
         pr(self.quiet, "\tTri lignes et colonnes...")
         # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
-        col = sorted(col, key=lambda x: (len(x), x))
-        lig = sorted(lig, key=lambda x: (len(x), x))
+        lig = sorted(list(lig))
+        col = sorted(list(col))
         # ###
         pr(self.quiet, "\tConstruction des mots...")
-        encoded_words_set = set()
         letters = [[]] + [[i] for i in range(self.nalpha)]
-        thrs = []
-        for letter in letters:
-            th = ParaWords(lig, col, letter, self.hush, 2, quiet=self.quiet)
-            thrs.append(th)
-            th.start()
-        for th in thrs:
-            th.join()
-            encoded_words_set = encoded_words_set.union(th.words)
+        encoded_words_set = set()
+        if self.nb_proc > 1:
+            # MULTIPROCESSED
+            args = [(self.hush.maxlen, self.hush.base, self.hush.encode(l), lig, col) for l in letters]
+            p = multiprocessing.Pool(self.nb_proc)
+            for s in p.map(words_task, args):
+                encoded_words_set.update(s)
+        else:
+            # LINEAR
+            for letter in [self.hush.encode(l) for l in letters]:
+                for prefix in lig:
+                    for suffix in col:
+                        encoded_words_set.add(self.hush.encode(self.hush.decode((prefix, letter, suffix))))
+        lig = [self.hush.decode(x) for x in lig]
+        col = [self.hush.decode(x) for x in col]
         return lig, col, list(encoded_words_set)
 
     def proba_words_special(self, words, asdict=True):
-        suffs_batch = set()
         pr(self.quiet, "\tMise en batch des prefixes...")
-        t1 = time.time()
-        thrs = []
-        words_chunks = parts_of_list(words, self.batch_nb_threads)
-        for i in range(self.batch_nb_threads):
-            th = ParaBatchHush(words_chunks[i], self.hush)
-            th.start()
-            thrs.append(th)
-        for i in range(self.batch_nb_threads):
-            thrs[i].join()
-            suffs_batch = suffs_batch.union(thrs[i].preffixes_set)
-        del thrs
-        # del words_chunks
-        # for wcode in words:
-        #     w = self.hush.decode(wcode)
-        #     for i in range(len(w) + 1):
-        #         suffs_batch.add(self.hush.encode(w[:i]))
-        t2 = time.time()
-        print("dT : {0}".format((t2-t1)))
+        suffs_batch = set(words)  # Words themselves, then their prefixes
+        if self.nb_proc > 1:
+            # MULTIPROCESSED :
+            words_chunks = parts_of_list(words, self.nb_proc)
+            p = multiprocessing.Pool(self.nb_proc)
+            args = [(self.hush.maxlen, self.hush.base, words_chunk) for words_chunk in words_chunks]
+            for s in p.map(batch_task, args):
+                suffs_batch.update(s)
+        else:
+            # LINEAR :
+            for wcode in words:
+                suffs_batch.update(self.hush.prefixes_codes(wcode))
         suffs_batch = list(suffs_batch)
         # ################
         pr(self.quiet, "\tUtilisation du RNN...")
@@ -115,7 +110,6 @@ class SpexRandDrop(SpexHush):
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
         suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         if suffs_preds.shape[1] > self.nalpha + 2:
-            print("couic la colonne de padding !")
             suffs_preds = np.delete(suffs_preds, 0, axis=1)
         suffs_dict = {}
         for k in range(len(suffs_batch)):
@@ -123,29 +117,53 @@ class SpexRandDrop(SpexHush):
         del suffs_preds
         del suffs_batch
         pr(self.quiet, "\tCalcul de la probabilite des mots entiers...")
-        t1 = time.time()
-        preds = np.array([])
-        # words_chunks = parts_of_list(words, self.batch_nb_threads)
-        thrs = []
-        for i in range(self.batch_nb_threads):
-            th = ParaProbas(words_chunks[i], self.hush, suffs_dict)
-            th.start()
-            thrs.append(th)
-        for i in range(self.batch_nb_threads):
-            thrs[i].join()
-            preds = np.concatenate((preds, thrs[i].preds))
-        del thrs
-        del words_chunks
-        # preds = np.empty(len(words))
-        # for i in range(len(words)):
-        #     word = self.hush.decode(words[i]) + [self.nalpha + 1]
-        #     acc = 1.0
-        #     for k in range(len(word)):
-        #         acc *= suffs_dict[self.hush.encode(word[:k])][word[k]]
-        #     preds[i] = acc
-        t2 = time.time()
-        print("dT : {0}".format((t2 - t1)))
+        # Here the results are inexpected : Linear < Thread < Multiproc
+        # So we keep it simple linear...
+        # t1 = time.time()
+        # # MULTIPROCESSING
+        # preds1 = []
+        # if self.nb_proc > 1:
+        #     words_chunks = parts_of_list(words, self.nb_proc)
+        #     p = multiprocessing.Pool(self.nb_proc)
+        #     args = [(self.hush.maxlen, self.nalpha, chunk, dict(suffs_dict)) for chunk in words_chunks]
+        #     for a in p.map(fullproba_task, args):
+        #         preds1 += a
+        # preds1 = np.array(preds1)
+        # t2 = time.time()
+        # print("dT : {0}".format((t2 - t1)))
+        # # THREADING
+        # t1 = time.time()
+        # preds2 = np.array([])
+        # words_chunks = parts_of_list(words, self.nb_proc)
+        # thrs = []
+        # for i in range(self.nb_proc):
+        #     th = ParaProbas(words_chunks[i], self.hush, suffs_dict)
+        #     th.start()
+        #     thrs.append(th)
+        # for i in range(self.nb_proc):
+        #     thrs[i].join()
+        #     preds2 = np.concatenate((preds2, thrs[i].preds))
+        # del thrs
+        # del words_chunks
+        # t2 = time.time()
+        # print("dT : {0}".format((t2 - t1)))
+        # # LINEAR
+        # t1 = time.time()
+        preds3 = np.empty(len(words))
+        for i in range(len(words)):
+            word = self.hush.decode(words[i]) + [self.nalpha + 1]
+            pcode = sorted(list(self.hush.prefixes_codes(words[i]))) + [words[i]]
+            acc = 1.0
+            for k in range(len(word)):
+                # acc *= suffs_dict[self.hush.encode(word[:k])][word[k]]
+                acc *= suffs_dict[pcode[k]][word[k]]
+            preds3[i] = acc
+        # t2 = time.time()
+        # print("dT : {0}".format((t2 - t1)))
         del suffs_dict
+        # assert np.array_equal(preds2, preds3)
+        # assert np.array_equal(preds1, preds2)
+        preds = preds3
         if asdict:  # On retourne un dictionnaire
             pr(self.quiet, "\tConstitution du dictionnaire...")
             probas = dict()
@@ -156,9 +174,69 @@ class SpexRandDrop(SpexHush):
             return preds
 
 
+class RangeUnion:
+    def __init__(self, ranges):
+        self.ranges = ranges
+        acc = 0
+        for r in self.ranges:
+            acc += (r.stop - r.start)
+        self.le = acc
+
+    def __len__(self):
+        return self.le
+
+    def __getitem__(self, item):
+        if item >= len(self):
+            raise IndexError
+        skip = 0
+        i = 0
+        while item > (skip + len(self.ranges[i]) - 1):
+            skip += len(self.ranges[i])
+            i += 1
+        return self.ranges[i][item - skip]
+
+    def __iter__(self):
+        for r in self.ranges:
+            for k in self.ranges[r]:
+                yield k
+
+
+def words_task(args):
+    maxlen, base, letter, rows, cols = args
+    h = Hush(maxlen, base)
+    enc_set = set()
+    for prefix in rows:
+        for suffix in cols:
+            enc_set.add(h.encode(h.decode((prefix, letter, suffix))))
+    return enc_set
+
+
+def batch_task(args):
+    maxlen, base, words = args
+    ret_set = set(words)
+    h = Hush(maxlen, base)
+    for wcode in words:
+        ret_set.update(h.prefixes_codes(wcode))
+    return ret_set
+
+
+def fullproba_task(args):
+    maxlen, base, words, dic = args
+    h = Hush(maxlen, base)
+    preds = [0]*(len(words))
+    for i in range(len(words)):
+        word = h.decode(words[i]) + [base + 1]
+        pcode = sorted(list(h.prefixes_codes(words[i]))) + [words[i]]
+        acc = 1.0
+        for k in range(len(word)):
+            acc *= dic[pcode[k]][word[k]]
+        preds[i] = acc
+    return preds
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 7 or len(sys.argv) > 9:
-        print("Usage :: {0} modelfile ranks lrows lcols coeffrows coeffcols[testfile testtargetsfile]"
+    if len(sys.argv) < 7 or len(sys.argv) > 10:
+        print("Usage :: {0} modelfile ranks lrows lcols coeffrows coeffcols [testfile testtargetsfile testmodel]"
               .format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
@@ -169,27 +247,21 @@ if __name__ == "__main__":
     print("Context :", context_a)
     arg_model = sys.argv[1]
     arg_ranks = [int(e) for e in sys.argv[2].split(sep="_")]
-    try:
-        arg_lrows = int(sys.argv[3])
-    except ValueError:
-        arg_lrows = [int(x) for x in sys.argv[3].split()]
-    try:
-        arg_lcols = int(sys.argv[4])
-    except ValueError:
-        arg_lcols = [int(x) for x in sys.argv[4].split()]
+    arg_lrows = [int(e) for e in sys.argv[3].split(sep="_")]
+    arg_lcols = [int(e) for e in sys.argv[4].split(sep="_")]
     arg_coeffrows = float(sys.argv[5])
     arg_coeffcols = float(sys.argv[6])
     if len(sys.argv) >= 9:
         arg_testfile = sys.argv[7]
         arg_testtargetsfile = sys.argv[8]
-        arg_perp = True
+        arg_aut_model = sys.argv[9]
     else:
         arg_testfile = ""
         arg_testtargetsfile = ""
-        arg_perp = False
+        arg_aut_model = ""
 
     spex = SpexRandDrop(arg_model, arg_lrows, arg_lcols, arg_coeffcols, arg_coeffrows,
-                        arg_testfile, arg_testtargetsfile, context_a)
+                        arg_testfile, arg_testtargetsfile, arg_aut_model, context_a)
     spex.ready()
     for rank in arg_ranks:
         est = spex.extr(rank)

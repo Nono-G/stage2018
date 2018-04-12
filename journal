@@ -643,17 +643,45 @@ intruoduits pas les modifs récentes ? corrections et perfectionnements. Encore 
 quand j'exécute dans le terminal, mais pas dans le debugger PyCharm ?!
 Non c'est bon j'ai trouvé, c'était ma faute, et c'était très con.
 
-Mardi 10 Avril : 9h - 11h30
+Mardi 10 Avril : 9h - 11h40 12h40 - 18h30
 Les apprentissages suivent leur cours, a 9h50, 84 sur 228 ont fini.
 Je vais essayer de plus utiliser les dicos autour de ndcg et autres pour accélérer les calculs.
 Gains de temps, mais usage de mémoire (mais bon c'est sur les ensemble de test donc c'est fixe et
 d'un ordre de grandeur raisonnable). Je pense que c'est une bonne chose.
 Je rajoute le calcul de dist l2 entre automates fourni par GR. Du coup c'est seulement entre vrai
 automate et automate extrait, par contre quel résultat est bon ? maauvais ? je manque de comparaison
-Dans l'article cité, seulement aspects théoriques.
+Dans l'article cité, seulement aspects théoriques. Mais bon ça coute pas cher a calculer.
+Sans surprise, pour un problème avec un gros alphabet (pb 10, nalpha = 11) on est cantonnés a des
+mots très courts, sinon temps explosif, donc ça marche pas terrible. Du coup il faut se tourner vers
+hank3, mais conso RAM explosive pour rien. Donc travaux pour améliorer hank3, il doit etre possible
+de faire bien mieux que générer tous les préfixes avant d'en piocher a peine 1% aléatoirement. Il fa
+ut les choper au hasard en fonction des besoins.
+Il est possible de calculer le code du prefixe directement a partir du code Hush d'un mot, piste que
+je pense intéréssante pour accélérer tout ça.
 
-Mercredi 11 Avril :
-Jeudi 12 Avril :
+Mercredi 11 Avril : 8h - 17h (ns)
+Les apprentissages ont presque fini, plus que 5 !
+Je continue le travail sur hank3 et plus particulièrement Hush, notament calcul de préfixes a partir
+utilisant le code ; sans repasser par le mot.
+Ok marche bien, éléments prometteurs !
+Grandes découvertes :
+C'est connu que threading ne fonctionne pas bien en python (GIL) sauf quand les I/O sont le facteur
+limitant. Le vrai usage multicoeur c'est multiprocessing, par contre il faut que les args soient
+picklables. Véritable usage 100% sur tous les coeurs en même temps. 
+La méthode union de set renvoie une copie, donc ça prend du temps pour rien, l'usage que je veux en
+faire c'est plutot la methode update. Gains notables de performances.
+Bon en allayt chercher divers amélioration partout, on a maintenant un hank3 très correct, qui va
+nous servir pour les problèmes avec beaucoup d'états.
+15h17 => Les apprentissages sont finis, je rends son cluster a PV =)
+Hank3 bien amélioré. C'est Ok. Seul point a vérifier : passage des vrais mots et pas de leur code à
+splearn ? C'est nécéssaire je crois. Et manière de compter les préfixes aléatoires.
+Réunion avec SA et RE :
+Passer les données au moulin pour de vrai.
+Explorer Représentation en deux dims : PCA ?
+
+Jeudi 12 Avril : 8h -
+Effectivement, attention a passer les mots non encodés à splearn.
+
 Vendredi 13 Avril : (sncf)
 
 Lundi 16 Avril :
