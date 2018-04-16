@@ -5,7 +5,6 @@ import random
 import time
 import numpy as np
 import multiprocessing
-import os
 # Project :
 from spextractor_common import ParaRowsCols, ParaWords, ParaBatchHush, pr, SpexHush, parts_of_list, ParaProbas, Hush
 
@@ -16,8 +15,6 @@ class SpexRandDrop(SpexHush):
         SpexHush.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, met_model, context)
         self.pref_drop = pref_drop
         self.suff_drop = suff_drop
-        self.nb_proc = len(os.sched_getaffinity(0))
-        self.patience = 250
 
     def gen_words(self):
         if not type(self.lrows) is list:
@@ -65,12 +62,11 @@ class SpexRandDrop(SpexHush):
         pr(self.quiet, "\tP-closures...")
         lig = self.rand_p_closed(lig, self.suff_drop)
         col = self.rand_p_closed(col, self.pref_drop)
-        pr(self.quiet, "\tTri lignes et colonnes...")
         # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
         lig = sorted(list(lig))
         col = sorted(list(col))
         # ###
-        pr(self.quiet, "\tConstruction des mots...")
+        pr(self.quiet, "\tAssembling words from suffixes and prefixes...")
         letters = [[]] + [[i] for i in range(self.nalpha)]
         encoded_words_set = set()
         if self.nb_proc > 1:
@@ -85,12 +81,13 @@ class SpexRandDrop(SpexHush):
                 for prefix in lig:
                     for suffix in col:
                         encoded_words_set.add(self.hush.encode(self.hush.decode((prefix, letter, suffix))))
+        # Splearn takes a list of words, it does not understand (yet) word codes.
         lig = [self.hush.decode(x) for x in lig]
         col = [self.hush.decode(x) for x in col]
         return lig, col, list(encoded_words_set)
 
     def proba_words_special(self, words, asdict=True):
-        pr(self.quiet, "\tMise en batch des prefixes...")
+        pr(self.quiet, "\tExtraction of prefixes...")
         suffs_batch = set(words)  # Words themselves, then their prefixes
         if self.nb_proc > 1:
             # MULTIPROCESSED :
@@ -105,7 +102,7 @@ class SpexRandDrop(SpexHush):
                 suffs_batch.update(self.hush.prefixes_codes(wcode))
         suffs_batch = list(suffs_batch)
         # ################
-        pr(self.quiet, "\tUtilisation du RNN...")
+        pr(self.quiet, "\tPredictions...")
         steps = math.ceil(len(suffs_batch) / self.batch_vol)
         g = self.gen_batch_decoded(suffs_batch, self.batch_vol)
         suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
@@ -116,7 +113,7 @@ class SpexRandDrop(SpexHush):
             suffs_dict[suffs_batch[k]] = suffs_preds[k]
         del suffs_preds
         del suffs_batch
-        pr(self.quiet, "\tCalcul de la probabilite des mots entiers...")
+        pr(self.quiet, "\tFullwords probas...")
         # Here the results are inexpected : Linear < Thread < Multiproc
         # So we keep it simple linear...
         # t1 = time.time()
@@ -165,7 +162,6 @@ class SpexRandDrop(SpexHush):
         # assert np.array_equal(preds1, preds2)
         preds = preds3
         if asdict:  # On retourne un dictionnaire
-            pr(self.quiet, "\tConstitution du dictionnaire...")
             probas = dict()
             for i in range(len(words)):
                 probas[words[i]] = preds[i]
@@ -266,3 +262,4 @@ if __name__ == "__main__":
     for rank in arg_ranks:
         est = spex.extr(rank)
         # est.Automaton.write(est.automaton, filename=("aut-"+context_a))
+    spex.print_metrics_chart()

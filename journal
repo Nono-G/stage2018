@@ -676,15 +676,54 @@ nous servir pour les problèmes avec beaucoup d'états.
 Hank3 bien amélioré. C'est Ok. Seul point a vérifier : passage des vrais mots et pas de leur code à
 splearn ? C'est nécéssaire je crois. Et manière de compter les préfixes aléatoires.
 Réunion avec SA et RE :
+Retravailler un peu les sorties des métriques : normalisation, nomenclature
 Passer les données au moulin pour de vrai.
 Explorer Représentation en deux dims : PCA ?
 
-Jeudi 12 Avril : 8h -
-Effectivement, attention a passer les mots non encodés à splearn.
+Jeudi 12 Avril : 8h - 11h30 12h - 16h
+Effectivement, attention a passer les mots non encodés à splearn. Test de confirmation avec hank4 vs
+hank3 avec coeff 1. Il faut maintenant trier les apprentissages.
+Ok pour les apprentissages sauf pb 39 qui a planté (c'est le seul, et les 6 variantes ont planté)
+On a pas mal de problèmes avec un apprentissage pas excellent (1.5+ de loss), c'est un peu déçevant
+mais c'est comme ça. C'est un bug de Splearn : Quand on charge un automate depuis un fichier, on
+déduit le nombre de symboles et d'états de ce qu'on rencontre, or implicitement si c'est 0, on ne
+met rien, il n'y a donc pas obligation que tous les symboles soient représentés, d'où un mauvais
+calcul du nalpha ! Une modification a la main de l'entête du fichier devtest suffira. Le train est
+en train de se faire sur ce pb, ça devrait prendre une demi-douzaine d'heure au pire.
+En attendant je ramasse le meilleur de chaque problème, rennomé pour que ce soit plus simple. Et je
+me documente un peu sur PCA.
+A cause de la pluie qu'on a pris en allant manger je suis tout mouillé, je partirais pas trop tard
+pour aller me sécher a la maison.
+Expériences pour tater du temps raisonnable ou non en extraction. On retrouve de bons résultats sur
+divers problèmes, c'est encourageant. Hank3 marche bien mais on dirait qu'il donne des résultats
+plus epsilonneux que hank4. L'epsilonnosité, a nb de préfixes constants, semble augmenter avec la
+longueur des mots considérés.
 
-Vendredi 13 Avril : (sncf)
+Vendredi 13 Avril : 8h30 - 12h30 (sncf)
+L'aprentissage du pb 39 est terminée, j'ai maintenant tout mes RNNs.
+Préparation d'un params_writer pour l'extraction comme pour l'apprentissage, mais c'est un peu plus
+compliqué de trouver les bons params partout, il y a une question d'équité, pour pas biaiser trop
+les résultats. Préparation retour plus adapté au parsing qu'à l'utilisateur.
+Implémentation de sorties du programme d'apprentissage pour usage industriel.
+10h : Sem Guillaume Rabusseau, réunion équipe
 
-Lundi 16 Avril :
+Lundi 16 Avril : 9h - 11h30 12h - 18h30
+Travail a une sortie mieux exploitable pour Hank. Nommage plus homogène et cohérent des variables.
+Ok a une sortie belle a l'oeil et correcte pour du parsing.
+Il faut maintenant que je lance, et pendant ce temps, que je me familiarise avec ACP et matplotlib,
+Que je fasse un parseur-plotteur.
+Sait-on jamais je refait un petit venv propre et gpu, pour voir si ça marche mieux, par contre la
+machine asfalda est équipée en K40, donc moins bien que les K80 de see4c par exemple, du coup c'est
+pas la fête en terme de perfs...
+Mouais un coeur et un gpu chez asfalda c'est comme 2 coeurs see4c a peu près, donc je pense que ça
+vaut pas le coup vu comme les gpu sont encombrés... a verifier avec une K80. K80 est deux fois plus
+rapide environ, ça commence a valoir le coup de se poser la question. Mais bon pour des raisons de
+concurrence à l'accès je vais m'en tenir au cpu je pense.
+Ok pour les expériences qui permettent de voir a peu près quelel taille est raisonnable ou non, on
+va lancer sur les 10 premiers comme d'hab et on vera ce que ça donne.
+Au fait le script pour tuer toutes mes taches ne fonctionne pas quand les taches n'ont pas de 
+"karma".
+
 Mardi 17 Avril :
 Mercredi 18 Avril :
 Jeudi 19 Avril :

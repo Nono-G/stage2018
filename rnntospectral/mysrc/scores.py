@@ -1,6 +1,7 @@
 # External
 import math
 import numpy as np
+from splearn import Automaton
 # Project
 from parse5 import best_n_args
 import spextractor_common
@@ -158,6 +159,71 @@ def ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
 
 def ndcg5(words, ref, approx):
     return ndcg(words, ref, approx, ndcg_l=5)
+
+
+def l2dist(wa1, wa2, l2dist_method='naive', sum_method='splearn'):
+    """
+    L2-dist and sub-functions made by Guillaume Rabusseau, adapted to python3 by myself.
+    :param wa1: Automaton
+    :param wa2: Automaton
+    :param l2dist_method: can be 'naive' or 'gramian'
+    :param sum_method: (only for 'naive') can be 'splearn' or 'fast' :D
+    ('fast' uses linear system solver instead of inversion to compute the sum over all strings)
+    :return: l2 distance between wa1 and wa2
+    """
+    if l2dist_method == 'naive':
+        wa1.initial *= -1
+        diff = wa1 + wa2
+        prod = WA_product(diff,diff)
+        if sum_method == 'splearn':
+            dist = prod.sum()
+        elif sum_method == 'fast':
+            dist = WA_sum(prod)
+        else:
+            raise NotImplementedError("this method is not implemented (valid options are 'splearn' and 'fast')")
+
+        wa1.initial *= -1
+        return dist
+    elif l2dist_method == 'gramian':
+        G1 = compute_gramian(wa1)
+        G2 = compute_gramian(wa2)
+        G12 = compute_gramian(wa1,wa2)
+        alpha1 = wa1.initial
+        alpha2 = wa2.initial
+        return alpha1.T.dot(G1).dot(alpha1) + alpha2.T.dot(G2).dot(alpha2) - 2*alpha1.T.dot(G12).dot(alpha2)
+    else:
+        raise NotImplementedError("this method is not implemented (valid options are 'naive' and 'gramian')")
+
+
+def WA_product(wa1,wa2):
+    """
+    :param wa1: Automaton
+    :param wa2: Automaton
+    :return: a WA computing the product of the functions computed by wa1 and wa2
+    !!! this WA will have wa1.nbS * wa2.nbS states !!!
+    """
+    assert wa1.nbL == wa2.nbL, "wa1 and wa2 must be on the same alphabet"
+    return Automaton(wa1.nbL,
+                     wa1.nbS*wa2.nbS,
+                     np.kron(wa1.initial,wa2.initial),
+                     np.kron(wa1.final,wa2.final),
+                     [np.kron(A1,A2) for (A1,A2) in zip(wa1.transitions,wa2.transitions)])
+
+
+def compute_gramian(wa1,wa2=None):
+    if wa2 is None:
+        wa2 = wa1
+    M = np.sum([np.kron(A1,A2) for (A1,A2) in zip(wa1.transitions,wa2.transitions)],axis=0)
+    I = np.eye(M.shape[0])
+    g = np.linalg.solve(I-M,np.kron(wa1.final,wa2.final))
+    return g.reshape(wa1.nbS,wa2.nbS)
+
+
+def WA_sum(wa):
+    M = np.sum(wa.transitions, axis=0)
+    I = np.eye(M.shape[0])
+    x = np.linalg.solve(I - M, wa.final)
+    return wa.initial.dot(x)
 
 # Remplacé par faster_ndcg depuis
 # Attention a ce que ncdcg_l soit <= la longueur de l'alphabet

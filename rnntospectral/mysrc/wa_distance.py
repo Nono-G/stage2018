@@ -5,7 +5,7 @@ Fait par Guillaume Rabusseau, je l'ai adapté pour python3
 import numpy as np
 from time import time
 from splearn.automaton import Automaton
-import matplotlib.pyplot as pl
+# import matplotlib.pyplot as pl
 
 
 def random_WA(nbL,nbS,mu=0,sigma=0.1):
@@ -92,13 +92,6 @@ def l2dist(wa1, wa2, l2dist_method='naive', sum_method='splearn'):
         return alpha1.T.dot(G1).dot(alpha1) + alpha2.T.dot(G2).dot(alpha2) - 2*alpha1.T.dot(G12).dot(alpha2)
     else:
         raise NotImplementedError("this method is not implemented (valid options are 'naive' and 'gramian')")
-
-
-
-
-
-
-
 
 def get_mean_and_std_from_list(L,N_trials):
     M = np.array(L).reshape(N_trials, int(len(L)/N_trials))

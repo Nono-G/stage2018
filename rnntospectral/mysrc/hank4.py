@@ -89,3 +89,4 @@ if __name__ == "__main__":
     for rank in arg_ranks:
         est = spex.extr(rank)
         # sp.Automaton.write(est.automaton, filename=("aut-{0}-{1}".format(context_a, rank)))
+    spex.print_metrics_chart()

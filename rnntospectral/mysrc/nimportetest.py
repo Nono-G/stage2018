@@ -1,12 +1,26 @@
-import keras
-from train2f import DenseLinkedEmbedding
-import train2f
+from hank3 import RangeUnion
+from spextractor_common import Hush
 
-m = train2f.my_load_model("../model-test-W5Fdata+pautomac+9.pautomac.trainN20E4B32S320L3M0-3")
 
-print(m.summary())
+def closer_inf(s, x):
+    i = 0
+    while i<len(s) and s[i]<x:
+        i += 1
+    return s[i-1]
 
-m = train2f.my_load_model("../model-test-W5Fdata+pautomac+9.pautomac.trainN20E4B32S320L3M1+DIGEST",
-                          "../model-test-W5Fdata+pautomac+9.pautomac.trainN20E4B32S320L3M1-3-WEIGHTS")
 
-print(m.summary())
+# for i in range(100):
+#     a = i
+#     b = h.decode(i)
+#     c = closer_inf(h.nl, i)
+#     d = (i - c) // h.base
+#     if i > 10:
+#         e = h.decode(h.nl[len(h.decode(i))-2] + d)
+#         print(a, b, c, d, e)
+#     else:
+#         print(a, b, c, d)
+
+# for i in range(300):
+#     a = i
+#     b = h.decode(i)
+#     print(a, b, [h.decode(kkk) for kkk in h.prefixes_codes(i)])
