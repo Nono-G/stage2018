@@ -8,8 +8,10 @@ nstates = [-666, 63,63,25,12,56,19,12,49,71,49,47,12,63,15,26,49,22,25,68,11,56,
 
 mode1rnn = [2, 8, 9]
 
-all_rows_cols = ["0_6","10","4"]
-all_drops = [(200,200),(500,500),(1000,1000),(2000,2000)]
+all_rows_cols = ["4", "0_6","10"]
+# all_drops = [(200,200),(500,500),(1000,1000),(2000,2000)]
+all_drops = [(2000,2000), (2000,3000)]
+rank_around = 15
 
 
 def rank(d,f,step):
@@ -26,7 +28,7 @@ for i in range(1, 11):
                 print("models/m{0}-m".format(i), end="")
             else:
                 print("\"models/m{0}-d models/m{0}-w\"".format(i), end="")
-            print(" "+rank(nstates[i]-10, nstates[i]+10, 2), rc, rc, dr[0], dr[1],
+            print(" "+rank(nstates[i]-rank_around, nstates[i]+rank_around, 1), rc, rc, dr[0], dr[1],
                   "data/pautomac/{0}.pautomac.test data/pautomac/{0}.pautomac_solution.txt data/pautomac/{0}.pautomac_model.txt".format(i))
 
 

@@ -6,6 +6,7 @@ import numpy as np
 import sys
 import splearn as sp
 import os
+import warnings
 # Project :
 import parse5 as parse
 import scores
@@ -242,6 +243,7 @@ class Spex:
         self.randwords_maxlen = 70
         self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
         self.patience = 250
+        self.rand_temperature = 6  # >= 1
         # Arguments :
         self.rnn_model = train2f.my_load_model(*(modelfilestring.split()))
         self.lrows = lrows
@@ -312,8 +314,10 @@ class Spex:
         self.eps_test_zeros_extr = None
         self.l2dis_target_extr = None
         self.eps_rand_zeros_target = None
-        self.eps_kl_rand_model_extr = None
+        self.eps_rand_zeros_rnn = None
         self.eps_rand_zeros_extr = None
+        self.eps_kl_rand_target_extr = None
+        self.eps_kl_rand_target_rnn = None
 
     def ready(self):
         if self.metrics_calc:
@@ -322,12 +326,15 @@ class Spex:
 
             self.true_automaton = sp.Automaton.load_Pautomac_Automaton(self.perplexity_model)
             self.x_test = parse.parse_fullwords(self.perplexity_train)
-            self.y_test_target = parse.parse_pautomac_results(self.perplexity_target)
-            pr(self.quiet, "\tGenerating random words and random-rnn words...")
-            self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
-            self.x_rnnw = gen_rnn_forever(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
+            # self.y_test_target = parse.parse_pautomac_results(self.perplexity_target)
+            pr(self.quiet, "\tGenerating random-target words and random-rnn words...")
+            # self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
+            # print(sum([self.true_automaton.val(w) for w in self.x_rand])/len(self.x_rand))
+            self.x_rand = self.aut_rand_words(self.randwords_nb, self.rand_temperature)
+            self.x_rnnw = gen_rnn(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
 
             pr(self.quiet, "\tEvaluating words and prefixes...")
+            self.y_test_target = [self.true_automaton.val(w) for w in self.x_test]
             self.y_test_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
             self.y_test_target_prefixes = proba_all_prefixes_aut(self.true_automaton, self.x_test)
             self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True, dic=self.y_test_rnn_prefixes)
@@ -344,10 +351,10 @@ class Spex:
             self.perp_test_target = scores.pautomac_perplexity(self.y_test_target, self.y_test_target)
             self.perp_test_rnn = scores.pautomac_perplexity(self.y_test_target, self.y_test_rnn)
             self.perp_rand_target = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_target))
-            self.perp_rand_rnn = scores.pautomac_perplexity(self.y_rand_target, self.y_rand_rnn)
+            self.perp_rand_rnn = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
 
             self.kld_test_target_rnn = scores.kullback_leibler(self.y_test_target, self.y_test_rnn)
-            self.kld_rand_target_rnn = scores.kullback_leibler(self.y_rand_target, self.y_rand_rnn)
+            self.kld_rand_target_rnn = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
 
             self.ndcg1_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1,
                                                      dic_ref=self.y_test_target_prefixes,
@@ -355,15 +362,20 @@ class Spex:
             self.ndcg5_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5,
                                                      dic_ref=self.y_test_target_prefixes,
                                                      dic_approx=self.y_test_rnn_prefixes)
+
             self.eps_rand_zeros_target = len([x for x in self.y_rand_target if x <= 0.0]) / len(self.y_rand_target)
+            self.eps_rand_zeros_rnn = len([x for x in self.y_rand_rnn if x <= 0.0]) / len(self.y_rand_rnn)
+            self.eps_kl_rand_target_rnn = neg_zero(self.y_rand_rnn, self.y_rand_target)
 
             self.metrics[(-1, "perp-test-target")] = self.perp_test_target
             self.metrics[(-1, "perp-test-rnn")] = self.perp_test_rnn
             self.metrics[(-1, "perp-rand-target")] = self.perp_rand_target
             self.metrics[(-1, "perp-rand-target-eps")] = self.eps_rand_zeros_target
             self.metrics[(-1, "perp-rand-rnn")] = self.perp_rand_rnn
+            self.metrics[(-1, "perp-rand-rnn-eps")] = self.eps_rand_zeros_rnn
             self.metrics[(-1, "kld-test-target-rnn")] = self.kld_test_target_rnn
             self.metrics[(-1, "kld-rand-target-rnn")] = self.kld_rand_target_rnn
+            self.metrics[(-1, "kld-rand-target-rnn-eps")] = self.eps_kl_rand_target_rnn
             self.metrics[(-1, "(1-wer)-test-target")] = self.wer_test_target
             self.metrics[(-1, "(1-wer)-test-rnn")] = 1 - self.wer_test_rnn
             self.metrics[(-1, "(1-wer)-rnnw-rnn")] = 1 - self.wer_rnnw_rnn
@@ -428,8 +440,8 @@ class Spex:
             self.ndcg5_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5,
                                                    dic_ref=self.y_rnnw_rnn_prefixes, dic_approx=self.y_rnnw_extr_prefixes)
             self.perp_rand_extr = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_extr))
-            self.kld_rand_rnn_extr = scores.kullback_leibler(self.y_rand_rnn, self.fix_probas(self.y_rand_extr))
-            self.kld_rand_extr_rnn = scores.kullback_leibler(self.y_rand_extr, self.y_rand_rnn)
+            self.kld_rand_rnn_extr = scores.kullback_leibler(self.fix_probas(self.y_rand_rnn), self.fix_probas(self.y_rand_extr))
+            self.kld_rand_extr_rnn = scores.kullback_leibler(self.y_rand_extr, self.fix_probas(self.y_rand_rnn))
             self.kld_rand_target_extr = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_extr))
             t, e = scores.wer_aut(extr_aut, self.x_test)
             self.wer_test_extr = e/t
@@ -437,7 +449,7 @@ class Spex:
             self.wer_rnnw_extr = e/t
 
             self.eps_test_zeros_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
-            self.eps_kl_rand_model_extr = neg_zero(self.y_rand_extr, self.y_rand_target)
+            self.eps_kl_rand_target_extr = neg_zero(self.y_rand_extr, self.y_rand_target)
             self.eps_rand_zeros_extr = len([x for x in self.y_rand_extr if x <= 0.0])/len(self.y_rand_extr)
 
             self.l2dis_target_extr = scores.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
@@ -482,6 +494,7 @@ class Spex:
                     ]
         mlen = max([len(m) for m in measures])+3
         width = 23
+        print(self.context)
         print("+", "-"*(mlen-1), "+", ("-" * width + "+") * len(self.ranks), sep="")
         print("| RANKS :", " "*(mlen-9), end="", sep="")
         for r in self.ranks:
@@ -540,7 +553,7 @@ class Spex:
               .format(self.kld_rand_target_rnn,
                       100 * self.eps_rand_zeros_extr, self.kld_rand_rnn_extr,
                       self.kld_rand_extr_rnn,
-                      100 * self.eps_kl_rand_model_extr, self.kld_rand_target_extr, ))
+                      100 * self.eps_kl_rand_target_extr, self.kld_rand_target_extr, ))
         print("\t(1-WER) Accuracy Rate on test file :")
         print("\t\t********\tModel :\t{0}\n"
               "\t\t********\tRNN :\t{1}\n"
@@ -599,6 +612,33 @@ class Spex:
             words.add(w)
         words = [list(w) for w in words]
         return words
+
+    def aut_rand_words(self, nbw, temp):
+        aut = self.true_automaton
+        words_set = set()
+        random.seed()
+        while len(words_set) < nbw:
+            word = []
+            state = temp_dist_rand(aut.initial, temp)
+            while state != -1:
+                next_trans = dict()
+                proba = list()
+                next_trans[0] = (-1, -1)
+                proba.append(aut.final[state])
+                i = 1
+                for l in range(len(aut.transitions)):
+                    for s in range(aut.nbS):
+                        next_trans[i] = (l, s)
+                        proba.append(aut.transitions[l][state][s])
+                        i += 1
+                n = temp_dist_rand(proba, temp)
+                word += [next_trans[n][0]]
+                state = next_trans[n][1]
+            words_set.add(tuple(word[:-1]))
+        words_list = [list(w) for w in words_set]
+        words_vals = [aut.val(w) for w in words_list]
+        pr(self.quiet, "\t\tTarget-temp-rand words : average p = {0}".format(sum(words_vals)/nbw))
+        return words_list  #, test_vals
 
     def fix_probas(self, seq, p=0.0):
         z = 0
@@ -663,6 +703,21 @@ class SpexHush(Spex):
 # #######
 # Fonctions utiles :
 # #######
+
+def temp_dist_rand(dist, temp):
+    # initial author : Benoit Favre; modified
+    with warnings.catch_warnings():
+        # It's ok to suppress warning since log(0) = -inf and exp(-inf) = 0, works fine
+        warnings.simplefilter("ignore")
+        #
+        ep = 10e-10
+        probas = [p+ep for p in dist]
+        probas = np.log(probas) / temp
+        e = np.exp(probas)
+        probas = e / np.sum(e)
+        return np.random.choice(len(probas), 1, p=probas)[0]
+
+
 def combinaisons_para(nalpha, dim):
     s = math.pow(nalpha, dim)
     a = [[0]*dim]*int(s)
@@ -740,7 +795,10 @@ def proba_all_prefixes_aut(model, words):
     for t in model.transitions:
         big_a = np.add(big_a, t)
     alpha_tilda_inf = np.subtract(np.identity(model.nbS), big_a)
-    alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    try:
+        alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    except np.linalg.linalg.LinAlgError:
+        alpha_tilda_inf = np.linalg.pinv(alpha_tilda_inf)
     alpha_tilda_inf = np.dot(alpha_tilda_inf, model.final)
     prefixes = set()
     for w in words:
@@ -751,7 +809,11 @@ def proba_all_prefixes_aut(model, words):
     for i in range(len(prefixes)):
         u = model.initial
         for l in prefixes[i]:
-            u = np.dot(u, model.transitions[l])
+            try:
+                u = np.dot(u, model.transitions[l])
+            except Exception:
+                print(l)
+                exit(1000)
         probas = np.empty(nalpha + 1)
         for symb in range(nalpha):
             probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
@@ -846,47 +908,7 @@ def neg_zero(seq1, seq2):
     return epsilon_used/len(seq1)
 
 
-def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
-    try:
-        nalpha = int(model.layers[0].input_dim) - 3
-    except AttributeError:
-        nalpha = int(model.layers[1].input_dim) - 3
-    pad = int(model.input.shape[1])
-    words = list()
-    dico = dict()
-    random.seed()
-    for seed in seeds:
-        for n in range(nb_per_seed):
-            word = list(seed)
-            enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in seed], pad)
-            while ((len(word) == 0) or (word[-1] != nalpha+1)) and len(word) <= maxlen:
-                try:
-                    probas = dico[tuple(enc_word)]
-                except KeyError:
-                    probas = model.predict(np.array([enc_word]))
-                    if probas.shape[1] > nalpha + 2:
-                        # print("couic la colonne de padding !")
-                        probas = np.delete(probas, 0, axis=1)
-                    dico[tuple(enc_word)] = probas
-                r = random.random()
-                borne = probas[0][0]
-                i = 0
-                while r > borne:
-                    i += 1
-                    borne += probas[0][i]
-                word += [i]
-                enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
-            if len(word) >= maxlen:
-                word += [nalpha+1]
-            # Il faut enlever le symbole de fin, par convention entre les fonctions les mots circulent toujours
-            # sans aucun encodage : pas de symbole de fin, de début, de +1, ...
-            # Si le dernier n'est pas un symbole de fin mais un autre, ben on l'enlève quand même, pas grave.
-            # C'est pour ça qu'on ajoute 1 a maxlen.
-            words.append(word[:-1])
-    return words
-
-
-def gen_rnn_forever(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=50, quiet=False):
+def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=50, quiet=False):
     try:
         nalpha = int(model.layers[0].input_dim) - 3
     except AttributeError:
@@ -900,26 +922,34 @@ def gen_rnn_forever(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=
         failed_words = 0
         while (len(words)-cur) < nb_per_seed and failed_words < patience:
             word = list(seed)
-            enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in seed], pad)
-            while ((len(word) == 0) or (word[-1] != nalpha+1)) and len(word) <= maxlen:
+            enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
+            while ((len(word) == 0) or (word[-1] != nalpha)) and len(word) <= maxlen:
                 try:
-                    probas = dico[tuple(enc_word)]
+                    probas = dico[tuple(word)]
                 except KeyError:
                     probas = model.predict(np.array([enc_word]))
                     if probas.shape[1] > nalpha + 2:
                         # print("couic la colonne de padding !")
                         probas = np.delete(probas, 0, axis=1)
-                    dico[tuple(enc_word)] = probas
-                r = random.random()
-                borne = probas[0][0]
-                i = 0
-                while r > borne:
-                    i += 1
-                    borne += probas[0][i]
+                    # We also remove the "begin" symbol, as it is not a valid choice
+                    probas = np.delete(probas, 4, axis=1)
+                    probas = probas[0]
+                    # Normalize it, because we made some deletions:
+                    s = sum(probas)
+                    probas = [p/s for p in probas]
+                    dico[tuple(word)] = probas
+                # r = random.random()
+                # borne = probas[0][0]
+                # i = 0
+                # while r > borne:
+                #     i += 1
+                #     borne += probas[0][i]
+                i = np.random.choice(len(probas), 1, p=probas)[0]
                 word += [i]
-                enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
+                # enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
+                enc_word = enc_word[1:]+[i+1]
             word = tuple(word)
-            if word[-1] == nalpha+1 and word not in words:
+            if word[-1] == nalpha and word not in words:
                 failed_words = 0
                 #  We want to pass around non-encoded words, so we remove the ending symbol at the end
                 words.add(word[:-1])
@@ -1022,3 +1052,42 @@ def gen_rnn_forever(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=
 #     if not quiet:
 #         print("(Epsilon value used {0} / {1} times ({2} neg and {3} zeros))".format(n+z, len(seq), n, z))
 #     return seq
+#
+# def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50):
+#     try:
+#         nalpha = int(model.layers[0].input_dim) - 3
+#     except AttributeError:
+#         nalpha = int(model.layers[1].input_dim) - 3
+#     pad = int(model.input.shape[1])
+#     words = list()
+#     dico = dict()
+#     random.seed()
+#     for seed in seeds:
+#         for n in range(nb_per_seed):
+#             word = list(seed)
+#             enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in seed], pad)
+#             while ((len(word) == 0) or (word[-1] != nalpha+1)) and len(word) <= maxlen:
+#                 try:
+#                     probas = dico[tuple(enc_word)]
+#                 except KeyError:
+#                     probas = model.predict(np.array([enc_word]))
+#                     if probas.shape[1] > nalpha + 2:
+#                         # print("couic la colonne de padding !")
+#                         probas = np.delete(probas, 0, axis=1)
+#                     dico[tuple(enc_word)] = probas
+#                 r = random.random()
+#                 borne = probas[0][0]
+#                 i = 0
+#                 while r > borne:
+#                     i += 1
+#                     borne += probas[0][i]
+#                 word += [i]
+#                 enc_word = parse.pad_0([nalpha+1]+[elt+1 for elt in word], pad)
+#             if len(word) >= maxlen:
+#                 word += [nalpha+1]
+#             # Il faut enlever le symbole de fin, par convention entre les fonctions les mots circulent toujours
+#             # sans aucun encodage : pas de symbole de fin, de début, de +1, ...
+#             # Si le dernier n'est pas un symbole de fin mais un autre, ben on l'enlève quand même, pas grave.
+#             # C'est pour ça qu'on ajoute 1 a maxlen.
+#             words.append(word[:-1])
+#     return words

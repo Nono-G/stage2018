@@ -1,26 +1,32 @@
-from hank3 import RangeUnion
-from spextractor_common import Hush
+import splearn as sp
+import parse5 as parse
+import numpy as np
 
+a = sp.Automaton.load_Pautomac_Automaton("../data/pautomac/3.pautomac_model.txt")
+words = parse.parse_fullwords("../data/pautomac/3.pautomac.test")
+sols = parse.parse_pautomac_results("../data/pautomac/3.pautomac_solution.txt")
 
-def closer_inf(s, x):
-    i = 0
-    while i<len(s) and s[i]<x:
-        i += 1
-    return s[i-1]
+vals = [a.val(w) for w in words]
+vals = np.dot(vals, 1/sum(vals))
+for i in range(len(words)):
+    r = min(vals[i], sols[i])/max(vals[i], sols[i])
+    if r < 0.9999:
+        print(i, r, vals[i] - sols[i])
 
+print("5")
+a = sp.Automaton.load_Pautomac_Automaton("../data/pautomac/5.pautomac_model.txt")
+big = np.zeros((a.nbS, a.nbS))
+for t in a.transitions:
+    big = np.add(big, t)
+big = np.subtract(np.identity(a.nbS),big)
+i = np.linalg.pinv(big)
+words = parse.parse_fullwords("../data/pautomac/5.pautomac.test")
+sols = parse.parse_pautomac_results("../data/pautomac/5.pautomac_solution.txt")
 
-# for i in range(100):
-#     a = i
-#     b = h.decode(i)
-#     c = closer_inf(h.nl, i)
-#     d = (i - c) // h.base
-#     if i > 10:
-#         e = h.decode(h.nl[len(h.decode(i))-2] + d)
-#         print(a, b, c, d, e)
-#     else:
-#         print(a, b, c, d)
+vals = [a.val(w) for w in words]
+vals = np.dot(vals, 1/sum(vals))
+for i in range(len(words)):
+    r = min(vals[i], sols[i])/max(vals[i], sols[i])
+    if r < 0.9999:
+        print(i, r, vals[i] - sols[i])
 
-# for i in range(300):
-#     a = i
-#     b = h.decode(i)
-#     print(a, b, [h.decode(kkk) for kkk in h.prefixes_codes(i)])

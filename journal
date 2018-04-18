@@ -719,13 +719,60 @@ Mouais un coeur et un gpu chez asfalda c'est comme 2 coeurs see4c a peu près, d
 vaut pas le coup vu comme les gpu sont encombrés... a verifier avec une K80. K80 est deux fois plus
 rapide environ, ça commence a valoir le coup de se poser la question. Mais bon pour des raisons de
 concurrence à l'accès je vais m'en tenir au cpu je pense.
-Ok pour les expériences qui permettent de voir a peu près quelel taille est raisonnable ou non, on
+Ok pour les expériences qui permettent de voir a peu près quelle taille est raisonnable ou non, on
 va lancer sur les 10 premiers comme d'hab et on vera ce que ça donne.
 Au fait le script pour tuer toutes mes taches ne fonctionne pas quand les taches n'ont pas de 
 "karma".
 
-Mardi 17 Avril :
-Mercredi 18 Avril :
+Mardi 17 Avril : 9h - 17h15 (ns yerba)
+Toutes les extractions on fini on dirait, bonne nouvelle, ça prend pas trop longtemps. Travaux sur
+parseur-ploteur. Comment représenter les données de manière satisfaisante ?
+Quelques conclusions pas très surprenantes : plus on met de mots mieux c'est, pour la suite on ne va
+garder que 2000x2000 et plus je pense, sachant que 2000x2000 prends entre 5 et 6 heures environ, je
+pense qu'on peut envisager de le doubler. Si l'ensemble des mots est trop "creux" == longueur max
+importante, on se retrouve avec une plus grande proportion d'epsilon, et ça met le pagaille.
+Découvertes matplotlib : plein de choses possibles mais compliqué
+En fait certaines extractions ont rencontré des problèmes on dirait, des histoires de logs negatifs
+dans le calculs de certaines mesures, a explorer. Plantage de toutes les variantes des pbs 2, 5 et 9
+Les erreurs viennent de ready:347 pour 2 et 9, et ready:332 pour 5
+Pour pb 2 et 9, le rnn renvoie un machin négatif dans certains (très) rare cas ? on va lui mettre un
+fix-probas ça le résoudra, du coup a envisager une mesure de l'epsilon.
+Pour pb 5, on tente une inversion d'une matrice pas inversible (Id mois somme des transitions) et
+c'est la merde ; conformément aux recommendations de SA, je rajoute dans ce cas là Id*(1e-9) pour
+pouvoir faire l'inversion. C'est inversible mais les calculs partent dans le mur totalement, des
+perpplexité a 10^10, des NaN partout.
+Pourquoi load_automaton a pour spécification qu'il ne marche pas pour les HMM ??
+Discussions avec Denis Arrivault et Dominique Benielli, mais pas de réponse au problème.
+Mail a RE pour lui demander son avis.
+
+Mercredi 18 Avril : 10h - 18h (ns yerba)
+Pas encore de réponse concernant pb5. J'enquête sur le bug des problèmes 2 et 9 : effectivement, il
+y a une valeur retournée de zéro. Sachant qu'elle est entourée de valeur de l'ordre de 10e-200 par
+moments, c'est une valeur infinitésimale qui est devenue un zéro. fixprobas peut régler ça, mais ne
+vaut-il pas mieux carrément enlever complétement la perplexité sur les mots aléatoires ?
+Plutôt que des mots vraiments complétement aléatoires, on peut peut etre utiliser des mots générés
+par l'automate pautomac mais avec une "temperature"; cf tp4 B. Favre. SA valide cette idée.
+Attention pour augmenter la variabilité, temp doit être > 1, c'est a dire diminuer les écarts entre
+probas.
+D'ailleurs ça attire mon attention sur le fait que la normalisation des probas dans les données de
+pautomac donne une proba très différente de la réalité, je vais recalculer ces probas plutôt que de
+les parser, on verra si ça donne un résultat très différent ou pas.
+Effectivement les valeurs sont très différentes, et ça me semble plus cohérent d'utiliser la version
+pas normalisée, comme je fais pour les autres, plutot que de normaliser tout le monde. En tout cas
+il ne faut pas mélanger des normalisés et des pas normalisés je pense.
+Curieusement, ça n'a pas d'impact sur la self-perp.
+Pour le pb5, j'essaye de changer un peu la valeur du epsilon ajouté sur la diagonale, mais ça donne
+toujours autant n'importe quoi. Autre piste de SA, remplacer inverse par pseudo-inverse, au moins ça
+ne bug pas, on va voir ce que ça produit comme résultat. Ok ça a l'air cohérent, c'est peut-être
+aussi simple que ça au final. Bon mais alors ça marche pour HMM ou non ?
+Corrections dans gen_rnn_words : même si la probabilité était extremement faible, il était possible
+de mettre un symbole "debut" en cours de mot, ce que l'automate ne reconnaissait pas, ça faisait un
+bug.
+Ok je pense avoir bloqué la voie a la plupart des bugs, on est prêts pour un grand lancement ?
+Question a étudier, pour un produit constant, quelle est la meilleure répartition entre nb de prefs 
+et de suffs ? Expériences par tatonnement, pas de résultat qui saute aux yeux, je vais m'en tenir a
+des "carrés" pour l'instant.
+
 Jeudi 19 Avril :
 Vendredi 20 Avril :
 

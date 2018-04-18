@@ -5,7 +5,7 @@ Fait par Guillaume Rabusseau, je l'ai adapté pour python3
 import numpy as np
 from time import time
 from splearn.automaton import Automaton
-# import matplotlib.pyplot as pl
+import matplotlib.pyplot as pl
 
 
 def random_WA(nbL,nbS,mu=0,sigma=0.1):

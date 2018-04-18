@@ -96,7 +96,10 @@ def wer_aut(aut, input_words, expected_words=None):
     for t in aut.transitions:
         big_a = np.add(big_a, t)
     alpha_tilda_inf = np.subtract(np.identity(aut.nbS), big_a)
-    alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    try:
+        alpha_tilda_inf = np.linalg.inv(alpha_tilda_inf)
+    except np.linalg.linalg.LinAlgError:
+        alpha_tilda_inf = np.linalg.pinv(alpha_tilda_inf)
     alpha_tilda_inf = np.dot(alpha_tilda_inf, aut.final)
     total = 0
     errors = 0
