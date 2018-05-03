@@ -198,20 +198,20 @@ class Hush:
             reste //= self.base
         return x
 
-    def prefix_code(self, x):
-        if x >= self.nl[1]:
+    def prefix_code(self, code):
+        if code >= self.nl[1]:
             i = 0
-            while i < self.maxlen and self.nl[i] <= x:
+            while i < self.maxlen and self.nl[i] <= code:
                 i += 1
             i -= 1
-            d = (x - self.nl[i]) // self.base
+            d = (code - self.nl[i]) // self.base
             return self.nl[i-1]+d
         else:
             return 0
 
-    def prefixes_codes(self, x):
+    def prefixes_codes(self, code):
         r = set()
-        c = x
+        c = code
         i = 0
         while i < self.maxlen and self.nl[i] <= c:
             i += 1
@@ -224,8 +224,34 @@ class Hush:
         r.add(0)
         return r
 
+    def suffix_code(self, code):
+        if code == 0:
+            return 0
+        le = self.len_code(code)
+        base = self.pows[le - 1]
+        diff = (((code - self.nl[le - 1]) // base) + 1) * base
+        return code - diff
+
+    def suffixes_codes(self, c):
+        ret = [c]
+        code = c
+        le = self.len_code(code)
+        while le > 0:
+            base = self.pows[le - 1]
+            diff = (((code - self.nl[le - 1]) // base) + 1) * base
+            code -= diff
+            ret.append(code)
+            le -= 1
+        return ret
+
     def concat_code(self, tup):
         return self.encode(self.decode(tup))
+
+    def len_code(self, code):
+        le = 0
+        while code >= self.nl[le]:
+            le += 1
+        return le
 
 
 class Spex:
@@ -234,13 +260,14 @@ class Spex:
     """
     def __init__(self, modelfilestring, lrows, lcols, perp_train="", perp_targ="", perp_model="", context=""):
         self.nb_proc = len(os.sched_getaffinity(0))
+        # self.nb_proc = 1
         self.is_ready = False
         # Semi-constants :
         self.quiet = False
         self.epsilon = 1e-30
         self.batch_vol = 2048
         self.randwords_minlen = 0
-        self.randwords_maxlen = 70
+        self.randwords_maxlen = 100
         self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
         self.patience = 250
         self.rand_temperature = 6  # >= 1
@@ -410,8 +437,8 @@ class Spex:
             pr(False, "Error, rank too big compared to the length of words")
             return None
         pr(self.quiet, "... Done !")
+        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         # Metrics :
-        # sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         if self.metrics_calc:
             print("Metrics for rank {0} :".format(rank))
             extr_aut = spectral_estimator.automaton
@@ -452,7 +479,7 @@ class Spex:
             self.eps_kl_rand_target_extr = neg_zero(self.y_rand_extr, self.y_rand_target)
             self.eps_rand_zeros_extr = len([x for x in self.y_rand_extr if x <= 0.0])/len(self.y_rand_extr)
 
-            self.l2dis_target_extr = scores.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
+            # self.l2dis_target_extr = scores.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
 
             self.metrics[(rank, "perp-test-extr")] = self.perp_test_extr
             self.metrics[(rank, "perp-test-extr-eps")] = self.eps_test_zeros_extr
@@ -475,13 +502,20 @@ class Spex:
             self.metrics[(rank, "ndcg5-test-rnn-extr")] = self.ndcg5_test_rnn_extr
             self.metrics[(rank, "ndcg5-test-target-extr")] = self.ndcg5_test_target_extr
             self.metrics[(rank, "ndcg5-rnnw-rnn-extr")] = self.ndcg5_rnnw_rnn_extr
-            self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
+            # self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
 
             self.print_last_extr_metrics()
         #
         return spectral_estimator
 
-    def print_metrics_chart(self):
+    def print_metrics_chart_n_max(self, n):
+        i = 0
+        while i+n < len(self.ranks):
+            self.print_metrics_chart(ranks=self.ranks[i:i+n])
+            i += n
+        self.print_metrics_chart(ranks=self.ranks[i:])
+
+    def print_metrics_chart(self, ranks=None):
         measures = ["perp-test-target", "perp-test-rnn", "perp-test-extr",
                     "perp-rand-target", "perp-rand-rnn", "perp-rand-extr",
                     "kld-test-target-rnn", "kld-test-rnn-extr", "kld-test-target-extr",
@@ -490,20 +524,22 @@ class Spex:
                     "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
                     "ndcg1-test-target-rnn", "ndcg1-test-rnn-extr", "ndcg1-test-target-extr", "ndcg1-rnnw-rnn-extr",
                     "ndcg5-test-target-rnn", "ndcg5-test-rnn-extr", "ndcg5-test-target-extr",
-                    "ndcg5-rnnw-rnn-extr", "l2dis-target-extr"
+                    "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
                     ]
+        if ranks is None:
+            ranks = self.ranks
         mlen = max([len(m) for m in measures])+3
         width = 23
         print(self.context)
-        print("+", "-"*(mlen-1), "+", ("-" * width + "+") * len(self.ranks), sep="")
+        print("+", "-"*(mlen-1), "+", ("-" * width + "+") * len(ranks), sep="")
         print("| RANKS :", " "*(mlen-9), end="", sep="")
-        for r in self.ranks:
+        for r in ranks:
             print("|{1:{0}}  ".format(width-2, r), end="")
         print("|")
-        print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(self.ranks), sep="")
+        print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(ranks), sep="")
         for m in measures:
             print("| ", m, " "*(mlen-len("  "+m)), sep="", end="")
-            for r in self.ranks:
+            for r in ranks:
                 try :
                     v = self.metrics[(r,m)]
                 except KeyError:
@@ -521,7 +557,7 @@ class Spex:
                 else:
                     print(" "*10, end="")
             print("|")
-        print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(self.ranks), sep="")
+        print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(ranks), sep="")
 
     def print_last_extr_metrics(self):
         print("\tPerplexity on test file : ")
@@ -555,7 +591,7 @@ class Spex:
                       self.kld_rand_extr_rnn,
                       100 * self.eps_kl_rand_target_extr, self.kld_rand_target_extr, ))
         print("\t(1-WER) Accuracy Rate on test file :")
-        print("\t\t********\tModel :\t{0}\n"
+        print("\t\t********\tTarget :\t{0}\n"
               "\t\t********\tRNN :\t{1}\n"
               "\t\t********\tExtr :\t{2}"
               .format(1 - self.wer_test_target,
@@ -567,7 +603,7 @@ class Spex:
               .format(1 - self.wer_rnnw_rnn,
                       1 - self.wer_rnnw_extr))
         print("\tNDCG:1 on test file :")
-        print("\t\t********\tModel-RNN :\t{0}\n"
+        print("\t\t********\tTarget-RNN :\t{0}\n"
               "\t\t********\tRNN-Extr :\t{1}\n"
               "\t\t********\tModel-Extr :\t{2}"
               .format(self.ndcg1_test_target_rnn,
@@ -577,7 +613,7 @@ class Spex:
         print("\t\t********\tRNN-Extr :\t{0}"
               .format(self.ndcg1_rnnw_rnn_extr))
         print("\tNDCG:5 on test file :")
-        print("\t\t********\tModel-RNN :\t{0}\n"
+        print("\t\t********\tTarget-RNN :\t{0}\n"
               "\t\t********\tRNN-Extr :\t{1}\n"
               "\t\t********\tModel-Extr :\t{2}"
               .format(self.ndcg5_test_target_rnn,
@@ -586,9 +622,9 @@ class Spex:
         print("\tNDCG:5 on RNN-generated words :")
         print("\t\t********\tRNN-Extr :\t{0}"
               .format(self.ndcg5_rnnw_rnn_extr))
-        print("\tl2-dist :")
-        print("\t\t********\tModel-Extr :\t{0}"
-              .format(self.l2dis_target_extr))
+        # print("\tl2-dist :")
+        # print("\t\t********\tTarget-Extr :\t{0}"
+        #       .format(self.l2dis_target_extr))
 
     def hankels(self):
         return []
@@ -669,7 +705,8 @@ class SpexHush(Spex):
             y = lcols
         else:
             y = max(lcols)
-        self.hush = Hush(x+y+1, self.nalpha)
+        # self.hush = Hush(x+y+1, self.nalpha)
+        self.hush = Hush(2*self.randwords_maxlen+5, self.nalpha)
 
     def gen_batch_decoded(self, word_list, batch_vol=1):
         current_v = 0
@@ -962,6 +999,7 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=50, quie
 # #######
 # Fonctions Conservées pour historique :
 # #######
+
 # def combinaisons(nalpha, dim):
 #     s = math.pow(nalpha, dim)
 #     a = [[0]*dim]*int(s)

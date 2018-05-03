@@ -162,10 +162,18 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
     nalpha, x_train, y_train = parse.parse_train(train_file, wid, padbefore=True)
     print(sample)
     if -1 < sample < len(x_train):
-        x_train, y_train = parse.random_sample(x_train, y_train, sample)
+        x_train, y_train = parse.random_sample(x_train, y_train, sample+3000)
+        x_val = np.array(list(x_train[sample:]))
+        x_train = np.array(list(x_train[:sample]))
+        y_val = np.array(list(y_train[sample:]))
+        y_train = np.array(list(y_train[:sample]))
+    else:
+        print("SAMPLING ABORTED, NOT ENOUGH SAMPLES")
+        do_test = False
     print(x_train.shape)
     if do_test:
-        _, x_val, y_val = parse.parse_train(test_file, len(x_train[0]), padbefore=True)
+        # _, x_val, y_val = parse.parse_train(test_file, len(x_train[0]), padbefore=True)
+        pass
     if mode == 0:
         model = model_shell_normal(len(x_train[0]), len(y_train[0]), neurons, nalpha, layer)
     elif mode == 1:

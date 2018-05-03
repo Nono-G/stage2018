@@ -649,7 +649,7 @@ Je vais essayer de plus utiliser les dicos autour de ndcg et autres pour accél�
 Gains de temps, mais usage de mémoire (mais bon c'est sur les ensemble de test donc c'est fixe et
 d'un ordre de grandeur raisonnable). Je pense que c'est une bonne chose.
 Je rajoute le calcul de dist l2 entre automates fourni par GR. Du coup c'est seulement entre vrai
-automate et automate extrait, par contre quel résultat est bon ? maauvais ? je manque de comparaison
+automate et automate extrait, par contre quel résultat est bon ? mauvais ? je manque de comparaison
 Dans l'article cité, seulement aspects théoriques. Mais bon ça coute pas cher a calculer.
 Sans surprise, pour un problème avec un gros alphabet (pb 10, nalpha = 11) on est cantonnés a des
 mots très courts, sinon temps explosif, donc ça marche pas terrible. Du coup il faut se tourner vers
@@ -670,7 +670,7 @@ limitant. Le vrai usage multicoeur c'est multiprocessing, par contre il faut que
 picklables. Véritable usage 100% sur tous les coeurs en même temps. 
 La méthode union de set renvoie une copie, donc ça prend du temps pour rien, l'usage que je veux en
 faire c'est plutot la methode update. Gains notables de performances.
-Bon en allayt chercher divers amélioration partout, on a maintenant un hank3 très correct, qui va
+Bon en allant chercher divers amélioration partout, on a maintenant un hank3 très correct, qui va
 nous servir pour les problèmes avec beaucoup d'états.
 15h17 => Les apprentissages sont finis, je rends son cluster a PV =)
 Hank3 bien amélioré. C'est Ok. Seul point a vérifier : passage des vrais mots et pas de leur code à
@@ -722,7 +722,8 @@ concurrence à l'accès je vais m'en tenir au cpu je pense.
 Ok pour les expériences qui permettent de voir a peu près quelle taille est raisonnable ou non, on
 va lancer sur les 10 premiers comme d'hab et on vera ce que ça donne.
 Au fait le script pour tuer toutes mes taches ne fonctionne pas quand les taches n'ont pas de 
-"karma".
+"karma". Faut le relancer plein de fois, au fur et a mesure que les premières sont supprimées, les
+dernières se font attribuer des karmas et peuvent être supprimées à leur tour.
 
 Mardi 17 Avril : 9h - 17h15 (ns yerba)
 Toutes les extractions on fini on dirait, bonne nouvelle, ça prend pas trop longtemps. Travaux sur
@@ -737,10 +738,10 @@ dans le calculs de certaines mesures, a explorer. Plantage de toutes les variant
 Les erreurs viennent de ready:347 pour 2 et 9, et ready:332 pour 5
 Pour pb 2 et 9, le rnn renvoie un machin négatif dans certains (très) rare cas ? on va lui mettre un
 fix-probas ça le résoudra, du coup a envisager une mesure de l'epsilon.
-Pour pb 5, on tente une inversion d'une matrice pas inversible (Id mois somme des transitions) et
+Pour pb 5, on tente une inversion d'une matrice pas inversible (Id monis somme des transitions) et
 c'est la merde ; conformément aux recommendations de SA, je rajoute dans ce cas là Id*(1e-9) pour
 pouvoir faire l'inversion. C'est inversible mais les calculs partent dans le mur totalement, des
-perpplexité a 10^10, des NaN partout.
+perplexité a 10^10, des NaN partout.
 Pourquoi load_automaton a pour spécification qu'il ne marche pas pour les HMM ??
 Discussions avec Denis Arrivault et Dominique Benielli, mais pas de réponse au problème.
 Mail a RE pour lui demander son avis.
@@ -773,19 +774,147 @@ Question a étudier, pour un produit constant, quelle est la meilleure répartit
 et de suffs ? Expériences par tatonnement, pas de résultat qui saute aux yeux, je vais m'en tenir a
 des "carrés" pour l'instant.
 
-Jeudi 19 Avril :
-Vendredi 20 Avril :
+Jeudi 19 Avril : 10h30 - 18h30 (ns yerba, demain on se met au terere ?)
+Les résultats mettent un peu plus de temps que prévu a arriver mais ils sont bons ! (Mieux vaut ça
+que l'inverse).
+Certains (1709034 par ex) sont morts par manque de mémoire il semblerait ! j'ai peut être été trop
+gourmand sur le nombre de mots aléatoires ? Ou alors c'est peut être une question de mémoire pour
+stocker les retours du gros usage du rnn, il semblerait qu'ils soient morts a peu près tous vers le
+même nombre de batch faits (~20k) autre observation sur le temps, finalement 2000x3000 sera souvent
+déraisonnable, il va falloir faire plus petit, surtout pour les grands alphabets. Mais du coup si
+on veut garder une meilleure équité, il va falloir diminuer tout le monde.
+Attendre de voir avec RE les résultats des expériences.
+Grande réunion RE:
+Ok pour pseudo inv (le pb est posé par des tout petits restes numériques, pas significatif), ok pour
+retenter avec moins que 2000x2000 mais aussi garder les gros pour avoir de beaux hameçons. 
+Finalement, load_automaton à l'air de semi-miraculeusement marcher pour les HMM. Les infos de "S"
+embarquent les infos nécéssaires pour passer de PFA a HMM.
+Je relance avec des tailles plus petites pour tout le monde, ça commence a faire trop de taches sur
+le cluster... Au fait, la tache 1709041 est morte par walltime, mais pas par RAM, alors qu'elle a 
+passé les 25k batchs (chez lifnode).
+En effet le message d'erreur est différent selon mort par WT ou (supposément) mem
+Présentation BluManta
 
-Lundi 23 Avril :
-Mardi 24 Avril :
-Mercredi 25 Avril :
-Jeudi 26 Avril :
+Vendredi 20 Avril : 8h - 12h
+Bon les extractions de la première phase n'ont pas fini, celles de la seconde pas commencé. Ça va
+prendre du temps mais j'ai un bon accès au cluster (42 jobs en cours !).
+Préparation de mon SIC de 10h, petites améliorations parseur-ploteur. Je devrai pouvoir m'en servir
+pour détecter qui a planté ou pas parmi tous mes jobs.
+SIC, réunion, ...
+
+Lundi 23 Avril : 9h30 - repas - 17h30
+Les extractions n'ont pas toutes fini mais presque. 
+Rédaction avec RE le matin, rédaction avec SA l'aprem.
+Problèmes, les extractions de la seconde phase plantent à cause d'un num de fichier trop long car
+trop de rangs différents. Donc on n'écrit plus l'ensemble des rangs considérés dans le contexte.
+Il va falloir relancer pour trois jours environ... Bon du coup avant de lancer je refait un essai
+local pour vérifier que tout se termine bien. ça met en lumière un problème : on dirait que l2-dist
+coute la peau des yeux en terme de RAM quand on atteint des automates extraits de taille ~100, du
+coup ça provoque une mort prématurée par manque de RAM, et ça sur les 12Go + Swap que j'ai en local,
+donc sur cluster ça risque pas de fonctionner ! Je refait la même extraction mais sans calculer la
+l2-dist et la mémoire reste sous contrôle. On va donc devoir se passer de l2-dist, ou tout au moins
+la recalculer ultérieurement en chargeant les automates.
+Je vais relancer mais le cluster est utilisé à 100%, j'espère que ça pourra se faire bientôt.
+1710850 ==> 1711281
+
+Mardi 24 Avril : 10h30 - (ns terere) - 19h
+Rédaction. Je suis pas trop content de la partie RNN, il faudra y revenir avec SA.
+Soutenance HDR Cécile Capponi l'aprem.
+
+Mercredi 25 Avril : 9h30 - repas~30m - 18h30
+Il ne reste plus que 252 extractions en cours, soit a peu près la moitié, et pas de bugs remarqués
+pour l'instant. Go cluster go !
+Rédaction. Ok j'arrive au bout de ce que je pouvais écrire dans un premier temps, je vais attendre
+un retour de RE et/ou SA sur ce que j'ai déjà écrit avant de passer à la suite. En attendant je fais
+des essais de PCA.
+Rapide point avec RE, puis amélioration PCA (Ok je saurais pas trop l'interpréter mais ça semble
+intéréssant) et rédaction.
+Relecture avec RE, beucoup de choses a modifier. L'idée nous vient d'essayer de faire une matrice de
+Hankel avec des mots représentatifs du RNN et pas seulement des mots aléatoires. Plus j'y pense et
+plus je me dit que c'est la bonne chose a faire, mais aussi que je ne comprends pas comment ça peut
+marcher actuellement !
+
+Jeudi 26 Avril : 10h - (yerba) - 18h
+Rédaction, correction et modification d'après les remarque de la relecture d'hier.
+à 11h11, "plus que" 154 taches en cours sur le cluster. Donc en gros on en fait 100 par jour, donc
+ça finira au début du WE.
+D'ailleurs il faudra penser a l'avenir a venir avec un torchon ou a changer de thermos, car je met
+de l'eau un peu partout, et j'ai plus de pull pour essuyer maintenant qu'il faut chaud =)
+Rédaction rédaction, ok à faire relire.
+Petite réunion RE et SA : Je vais implementer le bloc de mots gen par le rnn.
+Première expérience avec cette méthode : Attention ya une histoire de warning pour overflow ? On 
+dirait que c'est Hush qui s'étouffe avec de trop long mots, ce que je conçoit bien, mais je n'arrive
+pas à reproduire le bug de manière isolée.
+Résultats pas fous, largement moins bien que la méthode d'avant, est-ce a cause de ce bug ?
+/home/nono/stage2018/rnntospectral/mysrc/spextractor_common.py:176: \\ [en vrai ya pas de slash]
+ RuntimeWarning: overflow encountered in long_scalars
+  x += w[i]*self.pows[len(w)-i-1]
+
+Bug bizarre, encode-decode resort la meme sequence mais décalée de 1
+
+On pourrait si on a du temps faire la traque au concaténations de listes qui peuvent être accélérée
+en se servant de extend() plutôt que +
+
 Vendredi 27 Avril :
 
-Lundi 30 Avril : (Maison car polo demain ?)
-Mardi 1 Mai : FETE DU TRAVAIL (Polo)
-Mercredi 2 Mai :
-Jeudi 3 Mai :
+Lundi 30 Avril : (Maison car polo demain) 10h-
+Les extractions ont terminé, gros travail d'exploitation maintenant.
+Réunion tel avec RE pour relecture article. Pas mal de modifs. RE fera les modifs, moi je trie les
+résultats d'expériences et je chasse le bug de Hush.
+Ok après de longues dissections, il semblerait que c'était effectivement la faute de numpy.choice,
+car a cause de lui le retour du husheur passait en type int64 aussi au lui du type int natif.
+Comme quoi les languages pas typés...
+Ok c'est réglé mais les résultats sont toujours mauvais, étrange. En lisant l'article, il semblerait
+que finalement seulement les préfixes doivent être préfixes clos, on peut donc peut etre prendre les
+suffixes pour la base des suffixes pour avoir plus de mots représentatifs.
+Si ça marche pas bien c'est peut etre a cause d'un effet d'échelle qui compresse les petites valeurs
+mais avec trop peu de points avec grande valeur pour qu'on y gagne.
+
+Mardi 1 Mai : FETE DU TRAVAIL
+
+Mercredi 2 Mai : 12h-18h
+Retour en voiture + repas donc début tardif de la journée.
+Exploration des résultats pour avoir des graphiques rigolos
+Enorme frayeur que la nouvelle extraction ait été faite par accident avec le même fichier params que
+la première, mais en fait c'est bon. Ok bonne nouvelle on a pas trop de casse : 2/9 chez p5,
+9/9 p39, 1/9 p44, 1/9 p46, soit  13/432. Au pire ça prendra pas longtemps a refaire. Petites modifs
+de parseur-ploteur pour se simplifier la vie.
+Dans l'autre tas d'extraction (2000x2000, 2000x3000) il y a comme attendu beaucoup de pertes.
+Ok un premier joli exemple qui montre qu'on est vraiment très forts : scatter r/t e/r, ou frac invs.
+On est globalement bons un peu partout mais mauvais sur 2 ou trois problèmes (très mauvais), je n'ai
+pas encore d'interprétation ou d'explication pour les cas particuliers où ça fonctionne si mal.
+
+
+Jeudi 3 Mai : 10h - 18h
+Base de suffixes plutot que de préfixes pour S. Chantier en cours.
+Je commence par une fonction dans Hush pour faire (code ---> {ens des suffixes}) sans passer par un
+décodage, ça fera gagner du temps. Ok ça marche. Maintenant on s'en sert dans hank3 pour faire une
+base de suffixes avec des suffixes plutôt que des préfixes. Ok je fais l'expérience avec une taille
+de base volontairement insuffisante pour que la méthode habituelle ait de bons résultats, comme ça
+on verra si la nouvelle peut la battre.
+Première constatation, on a beaucoup moins de redondances ! avec taille 200*200, la méthode usuelle
+fait 60 batchs de préfixes uniques, la seconde 415 batchs !
+Au final résultats dans la même fourchette, mais quand même une légère avance pour l'ancienne façon,
+sauf sur les mesures sur l'ensemble rnnw, mais bon c'est assez normal je pense.
+Je vais essayer avec des tailles plus grandes pour voir si la diff s'affirme un peu.
+Au passage petite amélioration de performances, on ne va pas réévaluer des préfixes qu'on a évalué
+pendant la génération de mots avec le RNN, c'est toujours ça de pris, même si ça devrait être limité
+comme amélioration de performances.
+Bon avec des gros ensembles, la différence de performances s'amoindrit, mais pas la différence de
+temps de calcul ! Peut être que le pb utilisé (3) est trop facile pour mettre en valeur la méthode,
+je vais essayer avec le problème foireux (9). Bon les performances sont globalement abjectes. C'est
+surprenant car du point de vue du RNN, c'est celui avec la plus petite Loss. Et bim ! avec la base
+de mots générés par le RNN on lui casse le cul au problème 9 ! Très bonne approx du RNN, même avec
+une petite base (400x400).
+Préparations de graphiques, j'ai quelqeus idées mais je sais pas trop lesquelles sont les plus inté-
+réssantes et donc celles a essayer en priorité.
+Rédaction Intro avec RE, idées sur la suite des expés a mener.
+SPICE : 4, 7, 8 (10, 6)
+Je vais lancer les apprentissages de RNN sur ces problèmes, on verra plus tard pour les extractions.
+Le super résultat sur le pb9 donne envie de tout refaire avec la nouvelle méthode, ça demandera du
+temps, et il faut faire quelques expés avant pour déterminer les tailles raisonnables de bases.
+SPICE : jobs 1712666 ==> 1712701
+
 Vendredi 4 Mai : (sncf)
 
 Lundi 7 Mai :

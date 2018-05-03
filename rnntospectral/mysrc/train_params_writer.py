@@ -1,12 +1,12 @@
 
-all_probs = [("data/pautomac/{0}.pautomac.train".format(nb), "data/pautomac/{0}.pautomac.devtest".format(nb))
-             for nb in range(39, 40)]
-all_wid = [-1, 10]
-all_neurons = [30, 50, 120]
-all_epochs = [40]
+all_probs = [("data/spice/train/{0}.spice.train".format(nb), "OSEF")
+             for nb in [4, 7, 8]]
+all_wid = [-1, 8, 12]
+all_neurons = [30, 50, 120, 200]
+all_epochs = [50]
 all_batch = [32]
-all_sample = [60000]
-all_name = ["5Avr"]
+all_sample = [45000]
+all_name = ["3MaiSpice"]
 all_layer = [3]
 all_modes = [1]
 

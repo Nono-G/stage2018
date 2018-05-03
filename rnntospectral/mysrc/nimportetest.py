@@ -1,32 +1,46 @@
 import splearn as sp
 import parse5 as parse
 import numpy as np
+import spextractor_common as co
+import time
 
-a = sp.Automaton.load_Pautomac_Automaton("../data/pautomac/3.pautomac_model.txt")
-words = parse.parse_fullwords("../data/pautomac/3.pautomac.test")
-sols = parse.parse_pautomac_results("../data/pautomac/3.pautomac_solution.txt")
 
-vals = [a.val(w) for w in words]
-vals = np.dot(vals, 1/sum(vals))
-for i in range(len(words)):
-    r = min(vals[i], sols[i])/max(vals[i], sols[i])
-    if r < 0.9999:
-        print(i, r, vals[i] - sols[i])
+def suff(hu, code):
+    if code == 0:
+        return 0
+    le = hu.len_code(code)
+    ba = hu.pows[le-1]
+    diff = (((code-hu.nl[le-1]) // ba)+1) * ba
+    return code - diff
 
-print("5")
-a = sp.Automaton.load_Pautomac_Automaton("../data/pautomac/5.pautomac_model.txt")
-big = np.zeros((a.nbS, a.nbS))
-for t in a.transitions:
-    big = np.add(big, t)
-big = np.subtract(np.identity(a.nbS),big)
-i = np.linalg.pinv(big)
-words = parse.parse_fullwords("../data/pautomac/5.pautomac.test")
-sols = parse.parse_pautomac_results("../data/pautomac/5.pautomac_solution.txt")
 
-vals = [a.val(w) for w in words]
-vals = np.dot(vals, 1/sum(vals))
-for i in range(len(words)):
-    r = min(vals[i], sols[i])/max(vals[i], sols[i])
-    if r < 0.9999:
-        print(i, r, vals[i] - sols[i])
+def suffs(hu, c):
+    ret = [c]
+    code = c
+    le = hu.len_code(code)
+    while le > 0:
+        ba = hu.pows[le-1]
+        diff = (((code-hu.nl[le-1]) // ba)+1) * ba
+        code -= diff
+        ret.append(code)
+        le -= 1
+    return ret
+
+
+h = co.Hush(20, 4)
+print(h.pows)
+print(h.nl)
+# for i in range(0,1000):
+#     assert h.len_code(i) == len(h.decode(i))
+#     assert h.suffix_code(i) == h.encode(h.decode(i)[1:])
+#     assert [h.decode(s) for s in h.suffixes_codes(i)] == [h.decode(i)[x:] for x in range(len(h.decode(i))+1)]
+#     w = h.decode(i)
+#     x = h.encode(w[1:])
+#     d = i-x
+#     s = h.decode(x)
+#     # sbis = h.decode()
+#     print(i, w, x, d, s, [h.decode(s) for s in h.suffixes_codes(i)])
+
+
+
 
