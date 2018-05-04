@@ -2,19 +2,15 @@
 import math
 import sys
 import random
-import time
 import numpy as np
 import multiprocessing
-import warnings
 # Project :
-import parse5 as parse
-from spextractor_common import ParaRowsCols, ParaWords, ParaBatchHush, pr, SpexHush, parts_of_list, ParaProbas, Hush
+from spextractor_common import pr, SpexHush, parts_of_list, Hush
 
 
 class SpexRandDrop(SpexHush):
-    def __init__(self, modelfilestring, lrows, lcols, pref_drop,
-                 suff_drop, perp_train="", perp_targ="", met_model="", context=""):
-        SpexHush.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, met_model, context)
+    def __init__(self, modelfilestring, lrows, lcols, pref_drop, suff_drop, m_test_set="", m_model="", context=""):
+        SpexHush.__init__(self, modelfilestring, lrows, lcols, m_test_set, m_model, context)
         self.pref_drop = pref_drop
         self.suff_drop = suff_drop
         self.prelim_dict = dict()
@@ -30,18 +26,21 @@ class SpexRandDrop(SpexHush):
                 raise TypeError()
             else:
                 self.lcols = [i for i in range(self.lcols + 1)]
-        lig, col, wl = self.gen_words_indexes_as_lists_para_2()
+        lig, col, wl = self.gen_words_indexes_as_lists_para()
         return lig, col, wl
 
+    # noinspection PyPep8
     def rand_p_closed(self, words, targ_coeff):
         prefs_set = set()
         index_set = set()
         miss = 0
         if targ_coeff > 1.0:
             target = targ_coeff
+            # noinspection PyPep8
             tarfun = lambda x, y: x
         else:
             target = len(words)*targ_coeff
+            # noinspection PyPep8
             tarfun = lambda x, y: y
         while (tarfun(len(prefs_set), len(index_set)) < target) and miss < self.patience:
             key = random.randrange(0, len(words))
@@ -68,79 +67,6 @@ class SpexRandDrop(SpexHush):
         # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
         lig = sorted(list(lig))
         col = sorted(list(col))
-        # ###
-        pr(self.quiet, "\tAssembling words from suffixes and prefixes...")
-        letters = [[]] + [[i] for i in range(self.nalpha)]
-        encoded_words_set = set()
-        if self.nb_proc > 1:
-            # MULTIPROCESSED
-            args = [(self.hush.maxlen, self.hush.base, self.hush.encode(l), lig, col) for l in letters]
-            p = multiprocessing.Pool(self.nb_proc)
-            for s in p.map(words_task, args):
-                encoded_words_set.update(s)
-        else:
-            # LINEAR
-            for letter in [self.hush.encode(l) for l in letters]:
-                for prefix in lig:
-                    for suffix in col:
-                        encoded_words_set.add(self.hush.encode(self.hush.decode((prefix, letter, suffix))))
-        # Splearn takes a list of words, it does not understand (yet) word codes.
-        lig = [self.hush.decode(x) for x in lig]
-        col = [self.hush.decode(x) for x in col]
-        return lig, col, list(encoded_words_set)
-
-    def gen_words_indexes_as_lists_para_2(self):
-        nb_pref = self.pref_drop
-        nb_suff = self.suff_drop
-
-        hushed_words = set()
-        hushed_prefixes = set()
-        hushed_suffixes = set()
-        random.seed()
-        failed_words = 0
-        while (len(hushed_prefixes) < nb_pref or len(hushed_suffixes) < nb_suff) and failed_words < self.patience:
-            word = list()
-            enc_word = parse.pad_0([self.nalpha + 1], self.pad)  # Begin symbol, padded
-            while ((len(word) == 0) or (word[-1] != self.nalpha)) and len(word) <= self.randwords_maxlen:
-                try:
-                    probas = self.prelim_dict[tuple(word)]
-                except KeyError:
-                    probas = self.rnn_model.predict(np.array([enc_word]))
-                    if probas.shape[1] > self.nalpha + 2:
-                        # "couic la colonne de padding !"
-                        probas = np.delete(probas, 0, axis=1)
-                    # We also remove the "begin" symbol, as it is not a valid choice
-                    probas = np.delete(probas, 4, axis=1)
-                    probas = probas[0]  # Unwrap the predicted singleton
-                    # Normalize it, because we made some deletions:
-                    s = sum(probas)
-                    probas = [p / s for p in probas]
-                    self.prelim_dict[tuple(word)] = probas
-                i = np.asscalar(np.random.choice(len(probas), 1, p=probas)[0])
-                word += [i]
-                enc_word = enc_word[1:] + [i + 1]
-            if word[-1] == self.nalpha:
-                #  We want to pass around non-encoded words, so we remove the ending symbol at the end
-                coded_word = self.hush.encode(word[:-1])
-                if coded_word not in hushed_words:
-                    failed_words = 0  # Reset patience counter
-                    hushed_words.add(coded_word)
-                    hushed_prefixes.add(coded_word)
-                    hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
-                    hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
-                else:
-                    failed_words += 1
-            else:
-                failed_words += 1
-        if failed_words == self.patience:
-            pr(self.quiet, "\t\tRun out of patience !")
-        pr(self.quiet, "\t\tNb of prefixes from rnn-gen words = {0}, expected = {1}".format(len(hushed_prefixes), nb_pref))
-        pr(self.quiet, "\t\tNb of suffixes from rnn-gen words = {0}, expected = {1}".format(len(hushed_prefixes), nb_suff))
-        # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
-        lig = sorted(list(hushed_prefixes))
-        col = sorted(list(hushed_suffixes))
-        del hushed_prefixes
-        del hushed_suffixes
         # ###
         pr(self.quiet, "\tAssembling words from suffixes and prefixes...")
         letters = [[]] + [[i] for i in range(self.nalpha)]
@@ -311,12 +237,12 @@ def fullproba_task(args):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 7 or len(sys.argv) > 10:
-        print("Usage :: {0} modelfile ranks lrows lcols coeffrows coeffcols [testfile testtargetsfile testmodel]"
+    if len(sys.argv) < 7 or len(sys.argv) > 9:
+        print("Usage :: {0} modelfile ranks lrows lcols coeffrows coeffcols [testfile [modelfile]]"
               .format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
-    context_a = ("{0}l{1}({2})c{3}({4})"
+    context_a = ("H3-{0}l{1}({2})c{3}({4})"
                  .format(sys.argv[1], sys.argv[3], sys.argv[5], sys.argv[4], sys.argv[6])
                  .replace(" ", "_")
                  .replace("/", "+"))
@@ -328,17 +254,17 @@ if __name__ == "__main__":
     arg_lcols = [int(e) for e in sys.argv[4].split(sep="_")]
     arg_coeffrows = float(sys.argv[5])
     arg_coeffcols = float(sys.argv[6])
-    if len(sys.argv) >= 9:
+    if len(sys.argv) >= 8:
         arg_testfile = sys.argv[7]
-        arg_testtargetsfile = sys.argv[8]
-        arg_aut_model = sys.argv[9]
     else:
         arg_testfile = ""
-        arg_testtargetsfile = ""
+    if len(sys.argv) >= 9:
+        arg_aut_model = sys.argv[8]
+    else:
         arg_aut_model = ""
 
     spex = SpexRandDrop(arg_model, arg_lrows, arg_lcols, arg_coeffcols, arg_coeffrows,
-                        arg_testfile, arg_testtargetsfile, arg_aut_model, context_a)
+                        arg_testfile, arg_aut_model, context_a)
     for rank in arg_ranks:
         est = spex.extr(rank)
         # est.Automaton.write(est.automaton, filename=("aut-"+context_a))

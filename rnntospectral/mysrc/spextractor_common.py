@@ -258,7 +258,7 @@ class Spex:
     """
     SPctral EXtractor base abstract class.
     """
-    def __init__(self, modelfilestring, lrows, lcols, perp_train="", perp_targ="", perp_model="", context=""):
+    def __init__(self, modelfilestring, lrows, lcols, m_test_set="", m_model="", context=""):
         self.nb_proc = len(os.sched_getaffinity(0))
         # self.nb_proc = 1
         self.is_ready = False
@@ -268,16 +268,15 @@ class Spex:
         self.batch_vol = 2048
         self.randwords_minlen = 0
         self.randwords_maxlen = 100
-        self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
+        self.randwords_nb = 50  # Attention risque de boucle infinie si trop de mots !
         self.patience = 250
         self.rand_temperature = 6  # >= 1
         # Arguments :
         self.rnn_model = train2f.my_load_model(*(modelfilestring.split()))
         self.lrows = lrows
         self.lcols = lcols
-        self.perplexity_train = perp_train
-        self.perplexity_target = perp_targ
-        self.perplexity_model = perp_model
+        self.metrics_test_set = m_test_set
+        self.metrics_model = m_model
         self.context = context
         # Attributes derived from arguments :
         try:
@@ -287,18 +286,24 @@ class Spex:
             # "mode 1", with custom embedding
             self.nalpha = int(self.rnn_model.layers[1].input_dim) - 3
         self.pad = int(self.rnn_model.input.shape[1])
-        self.metrics_calc = (perp_train != "" and perp_targ != "" and perp_model != "")
+        self.metrics_calc_level = 0
+        if m_test_set != "":
+            # We have access to a test set, like in SPICE and PAUTOMAC
+            self.metrics_calc_level += 1
+            if m_model != "":
+                # We have access to a target WE, like in PAUTOMAC
+                self.metrics_calc_level += 1
         # Computed attributes
         self.prefixes = None
         self.suffixes = None
         self.words = None
         self.words_probas = None
         self.lhankels = None
+        self.last_extr_aut = None
         # metrics calculations attributes
         self.ranks = []
         self.true_automaton = None
         self.metrics = dict()
-
         self.x_test = None
         self.x_rand = None
         self.x_rnnw = None
@@ -347,67 +352,8 @@ class Spex:
         self.eps_kl_rand_target_rnn = None
 
     def ready(self):
-        if self.metrics_calc:
-            pr(self.quiet, "Metrics prelims...")
-            pr(self.quiet, "\tParsings...")
-
-            self.true_automaton = sp.Automaton.load_Pautomac_Automaton(self.perplexity_model)
-            self.x_test = parse.parse_fullwords(self.perplexity_train)
-            # self.y_test_target = parse.parse_pautomac_results(self.perplexity_target)
-            pr(self.quiet, "\tGenerating random-target words and random-rnn words...")
-            # self.x_rand = self.randwords(self.randwords_nb, self.randwords_minlen, self.randwords_maxlen)
-            # print(sum([self.true_automaton.val(w) for w in self.x_rand])/len(self.x_rand))
-            self.x_rand = self.aut_rand_words(self.randwords_nb, self.rand_temperature)
-            self.x_rnnw = gen_rnn(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
-
-            pr(self.quiet, "\tEvaluating words and prefixes...")
-            self.y_test_target = [self.true_automaton.val(w) for w in self.x_test]
-            self.y_test_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
-            self.y_test_target_prefixes = proba_all_prefixes_aut(self.true_automaton, self.x_test)
-            self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True, dic=self.y_test_rnn_prefixes)
-            self.y_rand_target = [self.true_automaton.val(w) for w in self.x_rand]
-            self.y_rand_rnn = self.proba_words_normal(self.x_rand, asdict=False)
-
-            pr(self.quiet, "\tRank-independent metrics...")
-            self.wer_test_rnn = e / t
-            t, e = scores.wer_aut(self.true_automaton, self.x_test)
-            self.wer_test_target = e / t
-            garb, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True)
-            self.wer_rnnw_rnn = e / t
-
-            self.perp_test_target = scores.pautomac_perplexity(self.y_test_target, self.y_test_target)
-            self.perp_test_rnn = scores.pautomac_perplexity(self.y_test_target, self.y_test_rnn)
-            self.perp_rand_target = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_target))
-            self.perp_rand_rnn = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
-
-            self.kld_test_target_rnn = scores.kullback_leibler(self.y_test_target, self.y_test_rnn)
-            self.kld_rand_target_rnn = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
-
-            self.ndcg1_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1,
-                                                     dic_ref=self.y_test_target_prefixes,
-                                                     dic_approx=self.y_test_rnn_prefixes)
-            self.ndcg5_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5,
-                                                     dic_ref=self.y_test_target_prefixes,
-                                                     dic_approx=self.y_test_rnn_prefixes)
-
-            self.eps_rand_zeros_target = len([x for x in self.y_rand_target if x <= 0.0]) / len(self.y_rand_target)
-            self.eps_rand_zeros_rnn = len([x for x in self.y_rand_rnn if x <= 0.0]) / len(self.y_rand_rnn)
-            self.eps_kl_rand_target_rnn = neg_zero(self.y_rand_rnn, self.y_rand_target)
-
-            self.metrics[(-1, "perp-test-target")] = self.perp_test_target
-            self.metrics[(-1, "perp-test-rnn")] = self.perp_test_rnn
-            self.metrics[(-1, "perp-rand-target")] = self.perp_rand_target
-            self.metrics[(-1, "perp-rand-target-eps")] = self.eps_rand_zeros_target
-            self.metrics[(-1, "perp-rand-rnn")] = self.perp_rand_rnn
-            self.metrics[(-1, "perp-rand-rnn-eps")] = self.eps_rand_zeros_rnn
-            self.metrics[(-1, "kld-test-target-rnn")] = self.kld_test_target_rnn
-            self.metrics[(-1, "kld-rand-target-rnn")] = self.kld_rand_target_rnn
-            self.metrics[(-1, "kld-rand-target-rnn-eps")] = self.eps_kl_rand_target_rnn
-            self.metrics[(-1, "(1-wer)-test-target")] = self.wer_test_target
-            self.metrics[(-1, "(1-wer)-test-rnn")] = 1 - self.wer_test_rnn
-            self.metrics[(-1, "(1-wer)-rnnw-rnn")] = 1 - self.wer_rnnw_rnn
-            self.metrics[(-1, "ndcg1-test-target-rnn")] = self.ndcg1_test_target_rnn
-            self.metrics[(-1, "ndcg5-test-target-rnn")] = self.ndcg5_test_target_rnn
+        if self.metrics_calc_level > 0:
+            self.rank_independent_metrics()
         # *********
         pr(self.quiet, "Prefixes, suffixes, words, ...")
         self.prefixes, self.suffixes, self.words = self.gen_words()
@@ -417,10 +363,65 @@ class Spex:
         self.lhankels = self.hankels()
         self.is_ready = True
 
+    def rank_independent_metrics(self):
+        pr(self.quiet, "Metrics prelims...")
+        self.x_test = parse.parse_fullwords(self.metrics_test_set)
+        self.x_rnnw = gen_rnn(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
+        self.y_test_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
+        self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True,
+                                                        dic=self.y_test_rnn_prefixes)
+        self.wer_test_rnn = e / t
+        garb, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True)
+        self.wer_rnnw_rnn = e / t
+
+        if self.metrics_calc_level > 1:
+            self.true_automaton = sp.Automaton.load_Pautomac_Automaton(self.metrics_model)
+            self.x_rand = self.aut_rand_words(self.randwords_nb, self.rand_temperature)
+            self.y_test_target = [self.true_automaton.val(w) for w in self.x_test]
+            self.y_test_target_prefixes = proba_all_prefixes_aut(self.true_automaton, self.x_test)
+            # noinspection PyTypeChecker
+            self.y_rand_target = [self.true_automaton.val(w) for w in self.x_rand]
+            self.y_rand_rnn = self.proba_words_normal(self.x_rand, asdict=False)
+            t, e = scores.wer_aut(self.true_automaton, self.x_test)
+            self.wer_test_target = e / t
+            self.perp_test_target = scores.pautomac_perplexity(self.y_test_target, self.y_test_target)
+            self.perp_test_rnn = scores.pautomac_perplexity(self.y_test_target, self.y_test_rnn)
+            self.perp_rand_target = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_target))
+            self.perp_rand_rnn = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
+            self.kld_test_target_rnn = scores.kullback_leibler(self.y_test_target, self.y_test_rnn)
+            self.kld_rand_target_rnn = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_rnn))
+            self.ndcg1_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=1,
+                                                     dic_ref=self.y_test_target_prefixes,
+                                                     dic_approx=self.y_test_rnn_prefixes)
+            self.ndcg5_test_target_rnn = scores.ndcg(self.x_test, self.true_automaton, self.rnn_model, ndcg_l=5,
+                                                     dic_ref=self.y_test_target_prefixes,
+                                                     dic_approx=self.y_test_rnn_prefixes)
+            self.eps_rand_zeros_target = len([x for x in self.y_rand_target if x <= 0.0]) / len(self.y_rand_target)
+            self.eps_rand_zeros_rnn = len([x for x in self.y_rand_rnn if x <= 0.0]) / len(self.y_rand_rnn)
+            self.eps_kl_rand_target_rnn = neg_zero(self.y_rand_rnn, self.y_rand_target)
+        # pr(self.quiet, "\tParsings...")
+        # pr(self.quiet, "\tGenerating random-target words and random-rnn words...")
+        # print(sum([self.true_automaton.val(w) for w in self.x_rand])/len(self.x_rand))
+        # pr(self.quiet, "\tEvaluating words and prefixes...")
+        # pr(self.quiet, "\tRank-independent metrics...")
+        self.metrics[(-1, "perp-test-target")] = self.perp_test_target
+        self.metrics[(-1, "perp-test-rnn")] = self.perp_test_rnn
+        self.metrics[(-1, "perp-rand-target")] = self.perp_rand_target
+        self.metrics[(-1, "perp-rand-target-eps")] = self.eps_rand_zeros_target
+        self.metrics[(-1, "perp-rand-rnn")] = self.perp_rand_rnn
+        self.metrics[(-1, "perp-rand-rnn-eps")] = self.eps_rand_zeros_rnn
+        self.metrics[(-1, "kld-test-target-rnn")] = self.kld_test_target_rnn
+        self.metrics[(-1, "kld-rand-target-rnn")] = self.kld_rand_target_rnn
+        self.metrics[(-1, "kld-rand-target-rnn-eps")] = self.eps_kl_rand_target_rnn
+        self.metrics[(-1, "(1-wer)-test-target")] = self.wer_test_target
+        self.metrics[(-1, "(1-wer)-test-rnn")] = (1 - self.wer_test_rnn if self.wer_test_rnn is not None else None)
+        self.metrics[(-1, "(1-wer)-rnnw-rnn")] = (1 - self.wer_rnnw_rnn if self.wer_rnnw_rnn is not None else None)
+        self.metrics[(-1, "ndcg1-test-target-rnn")] = self.ndcg1_test_target_rnn
+        self.metrics[(-1, "ndcg5-test-target-rnn")] = self.ndcg5_test_target_rnn
+
     def extr(self, rank):
         if not self.is_ready:
             self.ready()
-        self.ranks.append(rank)
         spectral_estimator = sp.Spectral(rank=rank, lrows=self.lrows, lcolumns=self.lrows,
                                          version='classic', partial=True, sparse=False,
                                          smooth_method='none', mode_quiet=self.quiet)
@@ -433,80 +434,85 @@ class Spex:
             # noinspection PyProtectedMember
             spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
             # OK on a du a peu près rattraper l'état après fit.
+            self.ranks.append(rank)
         except ValueError:
-            pr(False, "Error, rank too big compared to the length of words")
+            pr(False, "Error, rank {0} too big compared to the length of words".format(rank))
             return None
         pr(self.quiet, "... Done !")
-        sp.Automaton.write(spectral_estimator.automaton, filename=("aut-{0}-r-{1}".format(self.context, rank)))
+        self.last_extr_aut = spectral_estimator.automaton
+        sp.Automaton.write(self.last_extr_aut, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         # Metrics :
-        if self.metrics_calc:
-            print("Metrics for rank {0} :".format(rank))
-            extr_aut = spectral_estimator.automaton
-
-            pr(self.quiet, "\tEvaluating words and prefixes...")
-            y_test_extr = [extr_aut.val(w) for w in self.x_test]
-            self.y_rand_extr = [extr_aut.val(w) for w in self.x_rand]
-            self.y_test_extr_prefixes = proba_all_prefixes_aut(extr_aut, self.x_test)
-            self.y_rnnw_extr_prefixes = proba_all_prefixes_aut(extr_aut, self.x_rnnw)
-            self.y_rnnw_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True, quiet=True)
-
-            pr(self.quiet, "\tRank-dependent metrics...")
-            self.perp_test_extr = scores.pautomac_perplexity(self.y_test_target, self.fix_probas(y_test_extr))
-            self.kld_test_rnn_extr = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
-            self.kld_test_target_extr = scores.kullback_leibler(self.y_test_target, self.fix_probas(y_test_extr))
-            self.ndcg1_test_rnn_extr = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=1,
-                                                   dic_ref=self.y_test_rnn_prefixes, dic_approx=self.y_test_extr_prefixes)
-            self.ndcg1_test_target_extr = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=1,
-                                                      dic_ref=self.y_test_target_prefixes, dic_approx=self.y_test_extr_prefixes)
-            self.ndcg1_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=1,
-                                                   dic_ref=self.y_rnnw_rnn_prefixes, dic_approx=self.y_rnnw_extr_prefixes)
-            self.ndcg5_test_rnn_extr = scores.ndcg(self.x_test, self.rnn_model, extr_aut, ndcg_l=5,
-                                                   dic_ref=self.y_test_rnn_prefixes, dic_approx=self.y_test_extr_prefixes)
-            self.ndcg5_test_target_extr = scores.ndcg(self.x_test, self.true_automaton, extr_aut, ndcg_l=5,
-                                                      dic_ref=self.y_test_target_prefixes, dic_approx=self.y_test_extr_prefixes)
-            self.ndcg5_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, extr_aut, ndcg_l=5,
-                                                   dic_ref=self.y_rnnw_rnn_prefixes, dic_approx=self.y_rnnw_extr_prefixes)
-            self.perp_rand_extr = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_extr))
-            self.kld_rand_rnn_extr = scores.kullback_leibler(self.fix_probas(self.y_rand_rnn), self.fix_probas(self.y_rand_extr))
-            self.kld_rand_extr_rnn = scores.kullback_leibler(self.y_rand_extr, self.fix_probas(self.y_rand_rnn))
-            self.kld_rand_target_extr = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_extr))
-            t, e = scores.wer_aut(extr_aut, self.x_test)
-            self.wer_test_extr = e/t
-            t, e = scores.wer_aut(extr_aut, self.x_rnnw)
-            self.wer_rnnw_extr = e/t
-
-            self.eps_test_zeros_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
-            self.eps_kl_rand_target_extr = neg_zero(self.y_rand_extr, self.y_rand_target)
-            self.eps_rand_zeros_extr = len([x for x in self.y_rand_extr if x <= 0.0])/len(self.y_rand_extr)
-
-            # self.l2dis_target_extr = scores.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
-
-            self.metrics[(rank, "perp-test-extr")] = self.perp_test_extr
-            self.metrics[(rank, "perp-test-extr-eps")] = self.eps_test_zeros_extr
-            self.metrics[(rank, "perp-rand-extr")] = self.perp_rand_extr
-            self.metrics[(rank, "perp-rand-extr-eps")] = self.eps_rand_zeros_extr
-            self.metrics[(rank, "kld-test-rnn-extr")] = self.kld_test_rnn_extr
-            self.metrics[(rank, "kld-test-rnn-extr-eps")] = self.eps_test_zeros_extr
-            self.metrics[(rank, "kld-test-target-extr")] = self.kld_test_target_extr
-            self.metrics[(rank, "kld-test-target-extr-eps")] = self.eps_test_zeros_extr
-            self.metrics[(rank, "kld-rand-rnn-extr")] = self.kld_rand_rnn_extr
-            self.metrics[(rank, "kld-rand-rnn-extr-eps")] = self.eps_rand_zeros_extr
-            self.metrics[(rank, "kld-rand-extr-rnn")] = self.kld_rand_extr_rnn
-            self.metrics[(rank, "kld-rand-target-extr")] = self.kld_rand_target_extr
-            self.metrics[(rank, "kld-rand-target-extr-eps")] = self.eps_rand_zeros_extr
-            self.metrics[(rank, "(1-wer)-test-extr")] = 1 - self.wer_test_extr
-            self.metrics[(rank, "(1-wer)-rnnw-extr")] = 1 - self.wer_rnnw_extr
-            self.metrics[(rank, "ndcg1-test-rnn-extr")] = self.ndcg1_test_rnn_extr
-            self.metrics[(rank, "ndcg1-test-target-extr")] = self.ndcg1_test_target_extr
-            self.metrics[(rank, "ndcg1-rnnw-rnn-extr")] = self.ndcg1_rnnw_rnn_extr
-            self.metrics[(rank, "ndcg5-test-rnn-extr")] = self.ndcg5_test_rnn_extr
-            self.metrics[(rank, "ndcg5-test-target-extr")] = self.ndcg5_test_target_extr
-            self.metrics[(rank, "ndcg5-rnnw-rnn-extr")] = self.ndcg5_rnnw_rnn_extr
-            # self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
-
+        if self.metrics_calc_level > 0:
+            self.rank_dependent_metrics(rank)
             self.print_last_extr_metrics()
         #
         return spectral_estimator
+
+    def rank_dependent_metrics(self, rank):
+        print("Metrics for rank {0} :".format(rank))
+        y_test_extr = [self.last_extr_aut.val(w) for w in self.x_test]
+        self.y_test_extr_prefixes = proba_all_prefixes_aut(self.last_extr_aut, self.x_test)
+        self.y_rnnw_extr_prefixes = proba_all_prefixes_aut(self.last_extr_aut, self.x_rnnw)
+        self.y_rnnw_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True, quiet=True)
+        self.kld_test_rnn_extr = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
+        self.ndcg1_test_rnn_extr = scores.ndcg(self.x_test, self.rnn_model, self.last_extr_aut, ndcg_l=1,
+                                               dic_ref=self.y_test_rnn_prefixes, dic_approx=self.y_test_extr_prefixes)
+        self.ndcg1_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, self.last_extr_aut, ndcg_l=1,
+                                               dic_ref=self.y_rnnw_rnn_prefixes, dic_approx=self.y_rnnw_extr_prefixes)
+        self.ndcg5_test_rnn_extr = scores.ndcg(self.x_test, self.rnn_model, self.last_extr_aut, ndcg_l=5,
+                                               dic_ref=self.y_test_rnn_prefixes, dic_approx=self.y_test_extr_prefixes)
+        self.ndcg5_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, self.last_extr_aut, ndcg_l=5,
+                                               dic_ref=self.y_rnnw_rnn_prefixes, dic_approx=self.y_rnnw_extr_prefixes)
+        t, e = scores.wer_aut(self.last_extr_aut, self.x_test)
+        self.wer_test_extr = e / t
+        t, e = scores.wer_aut(self.last_extr_aut, self.x_rnnw)
+        self.wer_rnnw_extr = e / t
+        self.eps_test_zeros_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
+
+        if self.metrics_calc_level > 1:
+            self.y_rand_extr = [self.last_extr_aut.val(w) for w in self.x_rand]
+            self.perp_test_extr = scores.pautomac_perplexity(self.y_test_target, self.fix_probas(y_test_extr))
+            self.kld_test_target_extr = scores.kullback_leibler(self.y_test_target, self.fix_probas(y_test_extr))
+            self.ndcg1_test_target_extr = scores.ndcg(self.x_test, self.true_automaton, self.last_extr_aut, ndcg_l=1,
+                                                      dic_ref=self.y_test_target_prefixes,
+                                                      dic_approx=self.y_test_extr_prefixes)
+            self.ndcg5_test_target_extr = scores.ndcg(self.x_test, self.true_automaton, self.last_extr_aut, ndcg_l=5,
+                                                      dic_ref=self.y_test_target_prefixes,
+                                                      dic_approx=self.y_test_extr_prefixes)
+            self.perp_rand_extr = scores.pautomac_perplexity(self.y_rand_target, self.fix_probas(self.y_rand_extr))
+            self.kld_rand_rnn_extr = scores.kullback_leibler(self.fix_probas(self.y_rand_rnn),
+                                                             self.fix_probas(self.y_rand_extr))
+            self.kld_rand_extr_rnn = scores.kullback_leibler(self.y_rand_extr, self.fix_probas(self.y_rand_rnn))
+            self.kld_rand_target_extr = scores.kullback_leibler(self.y_rand_target, self.fix_probas(self.y_rand_extr))
+            self.eps_kl_rand_target_extr = neg_zero(self.y_rand_extr, self.y_rand_target)
+            self.eps_rand_zeros_extr = len([x for x in self.y_rand_extr if x <= 0.0]) / len(self.y_rand_extr)
+            # self.l2dis_target_extr = scores.l2dist(self.true_automaton, extr_aut, l2dist_method="gramian")
+
+        # pr(self.quiet, "\tEvaluating words and prefixes...")
+        # pr(self.quiet, "\tRank-dependent metrics...")
+
+        self.metrics[(rank, "perp-test-extr")] = self.perp_test_extr
+        self.metrics[(rank, "perp-test-extr-eps")] = self.eps_test_zeros_extr
+        self.metrics[(rank, "perp-rand-extr")] = self.perp_rand_extr
+        self.metrics[(rank, "perp-rand-extr-eps")] = self.eps_rand_zeros_extr
+        self.metrics[(rank, "kld-test-rnn-extr")] = self.kld_test_rnn_extr
+        self.metrics[(rank, "kld-test-rnn-extr-eps")] = self.eps_test_zeros_extr
+        self.metrics[(rank, "kld-test-target-extr")] = self.kld_test_target_extr
+        self.metrics[(rank, "kld-test-target-extr-eps")] = self.eps_test_zeros_extr
+        self.metrics[(rank, "kld-rand-rnn-extr")] = self.kld_rand_rnn_extr
+        self.metrics[(rank, "kld-rand-rnn-extr-eps")] = self.eps_rand_zeros_extr
+        self.metrics[(rank, "kld-rand-extr-rnn")] = self.kld_rand_extr_rnn
+        self.metrics[(rank, "kld-rand-target-extr")] = self.kld_rand_target_extr
+        self.metrics[(rank, "kld-rand-target-extr-eps")] = self.eps_rand_zeros_extr
+        self.metrics[(rank, "(1-wer)-test-extr")] = (1 - self.wer_test_extr if self.wer_test_extr is not None else None)
+        self.metrics[(rank, "(1-wer)-rnnw-extr")] = (1 - self.wer_rnnw_extr if self.wer_rnnw_extr is not None else None)
+        self.metrics[(rank, "ndcg1-test-rnn-extr")] = self.ndcg1_test_rnn_extr
+        self.metrics[(rank, "ndcg1-test-target-extr")] = self.ndcg1_test_target_extr
+        self.metrics[(rank, "ndcg1-rnnw-rnn-extr")] = self.ndcg1_rnnw_rnn_extr
+        self.metrics[(rank, "ndcg5-test-rnn-extr")] = self.ndcg5_test_rnn_extr
+        self.metrics[(rank, "ndcg5-test-target-extr")] = self.ndcg5_test_target_extr
+        self.metrics[(rank, "ndcg5-rnnw-rnn-extr")] = self.ndcg5_rnnw_rnn_extr
+        # self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
 
     def print_metrics_chart_n_max(self, n):
         i = 0
@@ -516,16 +522,25 @@ class Spex:
         self.print_metrics_chart(ranks=self.ranks[i:])
 
     def print_metrics_chart(self, ranks=None):
-        measures = ["perp-test-target", "perp-test-rnn", "perp-test-extr",
-                    "perp-rand-target", "perp-rand-rnn", "perp-rand-extr",
-                    "kld-test-target-rnn", "kld-test-rnn-extr", "kld-test-target-extr",
-                    "kld-rand-target-rnn", "kld-rand-rnn-extr", "kld-rand-extr-rnn", "kld-rand-target-extr",
-                    "(1-wer)-test-target", "(1-wer)-test-rnn", "(1-wer)-test-extr",
-                    "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
-                    "ndcg1-test-target-rnn", "ndcg1-test-rnn-extr", "ndcg1-test-target-extr", "ndcg1-rnnw-rnn-extr",
-                    "ndcg5-test-target-rnn", "ndcg5-test-rnn-extr", "ndcg5-test-target-extr",
-                    "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
-                    ]
+        if self.metrics_calc_level > 1 :
+            measures = ["perp-test-target", "perp-test-rnn", "perp-test-extr",
+                        "perp-rand-target", "perp-rand-rnn", "perp-rand-extr",
+                        "kld-test-target-rnn", "kld-test-rnn-extr", "kld-test-target-extr",
+                        "kld-rand-target-rnn", "kld-rand-rnn-extr", "kld-rand-extr-rnn", "kld-rand-target-extr",
+                        "(1-wer)-test-target", "(1-wer)-test-rnn", "(1-wer)-test-extr",
+                        "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
+                        "ndcg1-test-target-rnn", "ndcg1-test-rnn-extr", "ndcg1-test-target-extr", "ndcg1-rnnw-rnn-extr",
+                        "ndcg5-test-target-rnn", "ndcg5-test-rnn-extr", "ndcg5-test-target-extr",
+                        "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
+                        ]
+        else:
+            measures = ["kld-test-rnn-extr",
+                        "(1-wer)-test-rnn", "(1-wer)-test-extr",
+                        "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
+                        "ndcg1-test-rnn-extr", "ndcg1-rnnw-rnn-extr",
+                        "ndcg5-test-rnn-extr",
+                        "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
+                        ]
         if ranks is None:
             ranks = self.ranks
         mlen = max([len(m) for m in measures])+3
@@ -540,11 +555,11 @@ class Spex:
         for m in measures:
             print("| ", m, " "*(mlen-len("  "+m)), sep="", end="")
             for r in ranks:
-                try :
+                try:
                     v = self.metrics[(r,m)]
                 except KeyError:
                     v = self.metrics[(-1, m)]
-                try :
+                try:
                     e = self.metrics[(r,m+"-eps")]*100
                 except KeyError:
                     try:
@@ -560,71 +575,101 @@ class Spex:
         print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(ranks), sep="")
 
     def print_last_extr_metrics(self):
-        print("\tPerplexity on test file : ")
-        print("\t\t********\tTarget :\t{0}\n"
-              "\t\t********\tRNN :\t{1}\t{2:5.4f}\n"
-              "\t\t({3:5.2f}%)\tExtr :\t{4}\t{5:5.4f}"
-              .format(self.perp_test_target,
-                      self.perp_test_rnn, (self.perp_test_target / self.perp_test_rnn),
-                      100 * self.eps_test_zeros_extr, self.perp_test_extr, (self.perp_test_rnn / self.perp_test_extr)))
-        print("\tPerplexity on random words : ")
-        print("\t\t({0:5.2f}%)\tTarget :\t{1}\n"
-              "\t\t********\tRNN :\t{2}\n"
-              "\t\t({3:5.2f}%)\tExtr :\t{4}"
-              .format(100 * self.eps_rand_zeros_target, self.perp_rand_target,
-                      self.perp_rand_rnn,
-                      100 * self.eps_rand_zeros_extr, self.perp_rand_extr))
-        print("\tKL Divergence on test file : ")
-        print("\t\t******** \tTarget-RNN :\t{0}\n"
-              "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
-              "\t\t({3:5.2f}%)\tTest-Extr :\t{4}"
-              .format(self.kld_test_target_rnn,
-                      100 * self.eps_test_zeros_extr, self.kld_test_rnn_extr,
-                      100 * self.eps_test_zeros_extr, self.kld_test_target_extr))
-        print("\tKL Divergence on random words : ")
-        print("\t\t********\tTarget-RNN :\t{0}\n"
-              "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
-              "\t\t********\tExtr-RNN :\t{3}\n"
-              "\t\t({4:5.2f}%)\tModel-Extr :\t{5}"
-              .format(self.kld_rand_target_rnn,
-                      100 * self.eps_rand_zeros_extr, self.kld_rand_rnn_extr,
-                      self.kld_rand_extr_rnn,
-                      100 * self.eps_kl_rand_target_extr, self.kld_rand_target_extr, ))
-        print("\t(1-WER) Accuracy Rate on test file :")
-        print("\t\t********\tTarget :\t{0}\n"
-              "\t\t********\tRNN :\t{1}\n"
-              "\t\t********\tExtr :\t{2}"
-              .format(1 - self.wer_test_target,
-                      1 - self.wer_test_rnn,
-                      1 - self.wer_test_extr))
-        print("\t(1-WER) Accuracy Rate on RNN-generated words :")
-        print("\t\t********\tRNN :\t{0}\n"
-              "\t\t********\tExtr :\t{1}"
-              .format(1 - self.wer_rnnw_rnn,
-                      1 - self.wer_rnnw_extr))
-        print("\tNDCG:1 on test file :")
-        print("\t\t********\tTarget-RNN :\t{0}\n"
-              "\t\t********\tRNN-Extr :\t{1}\n"
-              "\t\t********\tModel-Extr :\t{2}"
-              .format(self.ndcg1_test_target_rnn,
-                      self.ndcg1_test_rnn_extr,
-                      self.ndcg1_test_target_extr))
-        print("\tNDCG:1 on RNN-generated words :")
-        print("\t\t********\tRNN-Extr :\t{0}"
-              .format(self.ndcg1_rnnw_rnn_extr))
-        print("\tNDCG:5 on test file :")
-        print("\t\t********\tTarget-RNN :\t{0}\n"
-              "\t\t********\tRNN-Extr :\t{1}\n"
-              "\t\t********\tModel-Extr :\t{2}"
-              .format(self.ndcg5_test_target_rnn,
-                      self.ndcg5_test_rnn_extr,
-                      self.ndcg5_test_target_extr))
-        print("\tNDCG:5 on RNN-generated words :")
-        print("\t\t********\tRNN-Extr :\t{0}"
-              .format(self.ndcg5_rnnw_rnn_extr))
-        # print("\tl2-dist :")
-        # print("\t\t********\tTarget-Extr :\t{0}"
-        #       .format(self.l2dis_target_extr))
+        if self.metrics_calc_level > 1 :
+            print("\tPerplexity on test file : ")
+            print("\t\t********\tTarget :\t{0}\n"
+                  "\t\t********\tRNN :\t{1}\t{2:5.4f}\n"
+                  "\t\t({3:5.2f}%)\tExtr :\t{4}\t{5:5.4f}"
+                  .format(self.perp_test_target,
+                          self.perp_test_rnn, (self.perp_test_target / self.perp_test_rnn),
+                          100 * self.eps_test_zeros_extr, self.perp_test_extr, (self.perp_test_rnn / self.perp_test_extr)))
+            print("\tPerplexity on random words : ")
+            print("\t\t({0:5.2f}%)\tTarget :\t{1}\n"
+                  "\t\t********\tRNN :\t{2}\n"
+                  "\t\t({3:5.2f}%)\tExtr :\t{4}"
+                  .format(100 * self.eps_rand_zeros_target, self.perp_rand_target,
+                          self.perp_rand_rnn,
+                          100 * self.eps_rand_zeros_extr, self.perp_rand_extr))
+            print("\tKL Divergence on test file : ")
+            print("\t\t******** \tTarget-RNN :\t{0}\n"
+                  "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
+                  "\t\t({3:5.2f}%)\tTest-Extr :\t{4}"
+                  .format(self.kld_test_target_rnn,
+                          100 * self.eps_test_zeros_extr, self.kld_test_rnn_extr,
+                          100 * self.eps_test_zeros_extr, self.kld_test_target_extr))
+            print("\tKL Divergence on random words : ")
+            print("\t\t********\tTarget-RNN :\t{0}\n"
+                  "\t\t({1:5.2f}%)\tRNN-Extr :\t{2}\n"
+                  "\t\t********\tExtr-RNN :\t{3}\n"
+                  "\t\t({4:5.2f}%)\tModel-Extr :\t{5}"
+                  .format(self.kld_rand_target_rnn,
+                          100 * self.eps_rand_zeros_extr, self.kld_rand_rnn_extr,
+                          self.kld_rand_extr_rnn,
+                          100 * self.eps_kl_rand_target_extr, self.kld_rand_target_extr, ))
+            print("\t(1-WER) Accuracy Rate on test file :")
+            print("\t\t********\tTarget :\t{0}\n"
+                  "\t\t********\tRNN :\t{1}\n"
+                  "\t\t********\tExtr :\t{2}"
+                  .format(1 - self.wer_test_target,
+                          1 - self.wer_test_rnn,
+                          1 - self.wer_test_extr))
+            print("\t(1-WER) Accuracy Rate on RNN-generated words :")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t********\tExtr :\t{1}"
+                  .format(1 - self.wer_rnnw_rnn,
+                          1 - self.wer_rnnw_extr))
+            print("\tNDCG:1 on test file :")
+            print("\t\t********\tTarget-RNN :\t{0}\n"
+                  "\t\t********\tRNN-Extr :\t{1}\n"
+                  "\t\t********\tModel-Extr :\t{2}"
+                  .format(self.ndcg1_test_target_rnn,
+                          self.ndcg1_test_rnn_extr,
+                          self.ndcg1_test_target_extr))
+            print("\tNDCG:1 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}"
+                  .format(self.ndcg1_rnnw_rnn_extr))
+            print("\tNDCG:5 on test file :")
+            print("\t\t********\tTarget-RNN :\t{0}\n"
+                  "\t\t********\tRNN-Extr :\t{1}\n"
+                  "\t\t********\tModel-Extr :\t{2}"
+                  .format(self.ndcg5_test_target_rnn,
+                          self.ndcg5_test_rnn_extr,
+                          self.ndcg5_test_target_extr))
+            print("\tNDCG:5 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}"
+                  .format(self.ndcg5_rnnw_rnn_extr))
+            # print("\tl2-dist :")
+            # print("\t\t********\tTarget-Extr :\t{0}"
+            #       .format(self.l2dis_target_extr))
+        else:
+            print("\tKL Divergence on test file : ")
+            print("\t\t({0:5.2f}%)\tRNN-Extr :\t{1}\n"
+                  .format(100 * self.eps_test_zeros_extr, self.kld_test_rnn_extr))
+            print("\t(1-WER) Accuracy Rate on test file :")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t********\tExtr :\t{1}"
+                  .format(1 - self.wer_test_rnn,
+                          1 - self.wer_test_extr))
+            print("\t(1-WER) Accuracy Rate on RNN-generated words :")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t********\tExtr :\t{1}"
+                  .format(1 - self.wer_rnnw_rnn,
+                          1 - self.wer_rnnw_extr))
+            print("\tNDCG:1 on test file :")
+            print("\t\t********\tRNN-Extr :\t{0}\n"
+                  .format(self.ndcg1_test_rnn_extr))
+            print("\tNDCG:1 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}"
+                  .format(self.ndcg1_rnnw_rnn_extr))
+            print("\tNDCG:5 on test file :")
+            print("\t\t********\tRNN-Extr :\t{0}\n"
+                  .format(self.ndcg5_test_rnn_extr))
+            print("\tNDCG:5 on RNN-generated words :")
+            print("\t\t********\tRNN-Extr :\t{0}"
+                  .format(self.ndcg5_rnnw_rnn_extr))
+            # print("\tl2-dist :")
+            # print("\t\t********\tTarget-Extr :\t{0}"
+            #       .format(self.l2dis_target_extr))
 
     def hankels(self):
         return []
@@ -674,7 +719,7 @@ class Spex:
         words_list = [list(w) for w in words_set]
         words_vals = [aut.val(w) for w in words_list]
         pr(self.quiet, "\t\tTarget-temp-rand words : average p = {0}".format(sum(words_vals)/nbw))
-        return words_list  #, test_vals
+        return words_list  # , test_vals
 
     def fix_probas(self, seq, p=0.0):
         z = 0
@@ -693,18 +738,18 @@ class Spex:
         return ret
 
 
-# SpexHush correspond a Hank3 et Hank4, ceux qui utilisent Hush
+# SpexHush correspond a Hank3, Hank4 et Hank5 : ceux qui utilisent Hush
 class SpexHush(Spex):
-    def __init__(self, modelfilestring, lrows, lcols, perp_train="", perp_targ="", perp_mod="", context=""):
-        Spex.__init__(self, modelfilestring, lrows, lcols, perp_train, perp_targ, perp_mod, context)
-        if type(lrows) is int:
-            x = lrows
-        else:
-            x = max(lrows)
-        if type(lcols) is int:
-            y = lcols
-        else:
-            y = max(lcols)
+    def __init__(self, modelfilestring, lrows, lcols, m_test_set="", perp_mod="", context=""):
+        Spex.__init__(self, modelfilestring, lrows, lcols, m_test_set, perp_mod, context)
+        # if type(lrows) is int:
+        #     x = lrows
+        # else:
+        #     x = max(lrows)
+        # if type(lcols) is int:
+        #     y = lcols
+        # else:
+        #     y = max(lcols)
         # self.hush = Hush(x+y+1, self.nalpha)
         self.hush = Hush(2*self.randwords_maxlen+5, self.nalpha)
 
@@ -846,11 +891,12 @@ def proba_all_prefixes_aut(model, words):
     for i in range(len(prefixes)):
         u = model.initial
         for l in prefixes[i]:
-            try:
-                u = np.dot(u, model.transitions[l])
-            except Exception:
-                print(l)
-                exit(1000)
+            u = np.dot(u, model.transitions[l])
+            # try:
+            #     u = np.dot(u, model.transitions[l])
+            # except Exception:
+            #     print(l)
+            #     exit(1000)
         probas = np.empty(nalpha + 1)
         for symb in range(nalpha):
             probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
@@ -991,7 +1037,7 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=50, quie
                 #  We want to pass around non-encoded words, so we remove the ending symbol at the end
                 words.add(word[:-1])
             else:
-                failed_words +=1
+                failed_words += 1
     pr(quiet, "\t\t{0} out of {1} words generated with rnn".format(len(words), len(seeds)*nb_per_seed))
     return [list(w) for w in words]
 
