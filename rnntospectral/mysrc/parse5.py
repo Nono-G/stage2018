@@ -131,9 +131,14 @@ def parse_fullwords(filename):
 
 
 def random_sample(x, y, nb):
-    shufflek = np.random.choice(x.shape[0], nb, replace=False)
-    x_ret = x[shufflek, :]
-    y_ret = y[shufflek, :]
+    try:
+        shufflek = np.random.choice(x.shape[0], nb, replace=False)
+        x_ret = x[shufflek, :]
+        y_ret = y[shufflek, :]
+    except AttributeError:
+        shufflek = np.random.choice(len(x), nb, replace=False)
+        x_ret = [x[i] for i in shufflek]
+        y_ret = [y[i] for i in shufflek]
     return x_ret, y_ret
 
 

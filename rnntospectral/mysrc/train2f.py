@@ -147,7 +147,7 @@ def trainf(train_file, wid, sample, neurons, epochs, batch, test_file="", layer=
     :param neurons: number of neurons in RNN layers, see model_shell_*() functions
     :param epochs: number of epochs of training
     :param batch: size of the batches of samples fed to the model during training
-    :param test_file: (Optional) neme of the file containg a test or validation set, loss on this set is computed at
+    :param test_file: (Optional) neme of the file containing a test or validation set, loss on this set is computed at
                       each epoch.
     :param layer: kind of RNN layer used, see model_shell_*() functions
     :param mode: Do we use custom embedding layer or not ? 1 means yes, 0 means no

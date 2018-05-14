@@ -268,7 +268,12 @@ class Spex:
         self.batch_vol = 2048
         self.randwords_minlen = 0
         self.randwords_maxlen = 100
-        self.randwords_nb = 50  # Attention risque de boucle infinie si trop de mots !
+        self.randwords_nb = 2000  # Attention risque de boucle infinie si trop de mots !
+        # Debug Warning !
+        if self.randwords_nb < 1000:
+            print("DEBUG - DEBUG - DEBUG - DEBUG - DEBUG")
+            print("Low randwords_nb for debug purpose ?")
+            print("DEBUG - DEBUG - DEBUG - DEBUG - DEBUG")
         self.patience = 250
         self.rand_temperature = 6  # >= 1
         # Arguments :
@@ -291,7 +296,7 @@ class Spex:
             # We have access to a test set, like in SPICE and PAUTOMAC
             self.metrics_calc_level += 1
             if m_model != "":
-                # We have access to a target WE, like in PAUTOMAC
+                # We have access to a target WA, like in PAUTOMAC
                 self.metrics_calc_level += 1
         # Computed attributes
         self.prefixes = None
@@ -309,9 +314,12 @@ class Spex:
         self.x_rnnw = None
         self.y_test_target = None
         self.y_test_rnn = None
+        self.y_test_extr = None
         self.y_rand_target = None
         self.y_rand_rnn = None
         self.y_rand_extr = None
+        self.y_rnnw_rnn = None
+        self.y_rnnw_extr = None
         self.y_test_target_prefixes = None
         self.y_test_rnn_prefixes = None
         self.y_test_extr_prefixes = None
@@ -350,6 +358,16 @@ class Spex:
         self.eps_rand_zeros_extr = None
         self.eps_kl_rand_target_extr = None
         self.eps_kl_rand_target_rnn = None
+        #
+        self.perprnn_test_rnn = None
+        self.perprnn_test_extr = None
+        self.perprnn_rnnw_rnn = None
+        self.perprnn_rnnw_extr = None
+        self.eps_rnnw_zeros_extr = None
+
+    @classmethod
+    def meter(cls, rnnstring, teststring="", modelstring=""):
+        return cls(rnnstring, -1, -1, teststring, modelstring)
 
     def ready(self):
         if self.metrics_calc_level > 0:
@@ -366,13 +384,19 @@ class Spex:
     def rank_independent_metrics(self):
         pr(self.quiet, "Metrics prelims...")
         self.x_test = parse.parse_fullwords(self.metrics_test_set)
+        # self.x_test, _ = parse.random_sample(self.x_test, self.x_test, 2000)
         self.x_rnnw = gen_rnn(self.rnn_model, nb_per_seed=self.randwords_nb, maxlen=self.randwords_maxlen)
         self.y_test_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_test, del_start_symb=True)
         self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True,
                                                         dic=self.y_test_rnn_prefixes)
         self.wer_test_rnn = e / t
-        garb, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True)
+        self.y_rnnw_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True, quiet=True)
+        self.y_rnnw_rnn, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True,
+                                                        dic=self.y_rnnw_rnn_prefixes)
         self.wer_rnnw_rnn = e / t
+        #
+        self.perprnn_test_rnn = scores.pautomac_perplexity(self.y_test_rnn, self.y_test_rnn)
+        self.perprnn_rnnw_rnn = scores.pautomac_perplexity(self.y_rnnw_rnn, self.y_rnnw_rnn)
 
         if self.metrics_calc_level > 1:
             self.true_automaton = sp.Automaton.load_Pautomac_Automaton(self.metrics_model)
@@ -418,6 +442,9 @@ class Spex:
         self.metrics[(-1, "(1-wer)-rnnw-rnn")] = (1 - self.wer_rnnw_rnn if self.wer_rnnw_rnn is not None else None)
         self.metrics[(-1, "ndcg1-test-target-rnn")] = self.ndcg1_test_target_rnn
         self.metrics[(-1, "ndcg5-test-target-rnn")] = self.ndcg5_test_target_rnn
+        #
+        self.metrics[(-1, "perprnn-test-rnn")] = self.perprnn_test_rnn
+        self.metrics[(-1, "perprnn-rnnw-rnn")] = self.perprnn_rnnw_rnn
 
     def extr(self, rank):
         if not self.is_ready:
@@ -434,7 +461,6 @@ class Spex:
             # noinspection PyProtectedMember
             spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
             # OK on a du a peu près rattraper l'état après fit.
-            self.ranks.append(rank)
         except ValueError:
             pr(False, "Error, rank {0} too big compared to the length of words".format(rank))
             return None
@@ -443,18 +469,20 @@ class Spex:
         sp.Automaton.write(self.last_extr_aut, filename=("aut-{0}-r-{1}".format(self.context, rank)))
         # Metrics :
         if self.metrics_calc_level > 0:
-            self.rank_dependent_metrics(rank)
+            self.rank_dependent_metrics()
             self.print_last_extr_metrics()
         #
         return spectral_estimator
 
-    def rank_dependent_metrics(self, rank):
+    def rank_dependent_metrics(self):
+        rank = self.last_extr_aut.nbS
+        self.ranks.append(rank)
         print("Metrics for rank {0} :".format(rank))
-        y_test_extr = [self.last_extr_aut.val(w) for w in self.x_test]
+        self.y_test_extr = [self.last_extr_aut.val(w) for w in self.x_test]
+        self.y_rnnw_extr = [self.last_extr_aut.val(w) for w in self.x_rnnw]
         self.y_test_extr_prefixes = proba_all_prefixes_aut(self.last_extr_aut, self.x_test)
         self.y_rnnw_extr_prefixes = proba_all_prefixes_aut(self.last_extr_aut, self.x_rnnw)
-        self.y_rnnw_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, del_start_symb=True, quiet=True)
-        self.kld_test_rnn_extr = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(y_test_extr))
+        self.kld_test_rnn_extr = scores.kullback_leibler(self.y_test_rnn, self.fix_probas(self.y_test_extr))
         self.ndcg1_test_rnn_extr = scores.ndcg(self.x_test, self.rnn_model, self.last_extr_aut, ndcg_l=1,
                                                dic_ref=self.y_test_rnn_prefixes, dic_approx=self.y_test_extr_prefixes)
         self.ndcg1_rnnw_rnn_extr = scores.ndcg(self.x_rnnw, self.rnn_model, self.last_extr_aut, ndcg_l=1,
@@ -467,12 +495,15 @@ class Spex:
         self.wer_test_extr = e / t
         t, e = scores.wer_aut(self.last_extr_aut, self.x_rnnw)
         self.wer_rnnw_extr = e / t
-        self.eps_test_zeros_extr = len([x for x in y_test_extr if x <= 0.0]) / len(y_test_extr)
+        self.eps_test_zeros_extr = len([x for x in self.y_test_extr if x <= 0.0]) / len(self.y_test_extr)
+        self.eps_rnnw_zeros_extr = len([x for x in self.y_rnnw_extr if x <= 0.0]) / len(self.y_rnnw_extr)
+        self.perprnn_test_extr = scores.pautomac_perplexity(self.y_test_rnn, self.fix_probas(self.y_test_extr))
+        self.perprnn_rnnw_extr = scores.pautomac_perplexity(self.y_rnnw_rnn, self.fix_probas(self.y_rnnw_extr))
 
         if self.metrics_calc_level > 1:
             self.y_rand_extr = [self.last_extr_aut.val(w) for w in self.x_rand]
-            self.perp_test_extr = scores.pautomac_perplexity(self.y_test_target, self.fix_probas(y_test_extr))
-            self.kld_test_target_extr = scores.kullback_leibler(self.y_test_target, self.fix_probas(y_test_extr))
+            self.perp_test_extr = scores.pautomac_perplexity(self.y_test_target, self.fix_probas(self.y_test_extr))
+            self.kld_test_target_extr = scores.kullback_leibler(self.y_test_target, self.fix_probas(self.y_test_extr))
             self.ndcg1_test_target_extr = scores.ndcg(self.x_test, self.true_automaton, self.last_extr_aut, ndcg_l=1,
                                                       dic_ref=self.y_test_target_prefixes,
                                                       dic_approx=self.y_test_extr_prefixes)
@@ -513,6 +544,13 @@ class Spex:
         self.metrics[(rank, "ndcg5-test-target-extr")] = self.ndcg5_test_target_extr
         self.metrics[(rank, "ndcg5-rnnw-rnn-extr")] = self.ndcg5_rnnw_rnn_extr
         # self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
+        self.metrics[(rank, "perprnn-test-rnn")] = self.perprnn_test_rnn
+        self.metrics[(rank, "perprnn-test-rnn-eps")] = self.eps_test_zeros_extr
+        self.metrics[(rank, "perprnn-test-extr")] = self.perprnn_test_extr
+        self.metrics[(rank, "perprnn-rnnw-rnn")] = self.perprnn_rnnw_rnn
+        self.metrics[(rank, "perprnn-rnnw-rnn-eps")] = self.eps_rnnw_zeros_extr
+        self.metrics[(rank, "perprnn-rnnw-extr")] = self.perprnn_rnnw_extr
+
 
     def print_metrics_chart_n_max(self, n):
         i = 0
@@ -531,7 +569,8 @@ class Spex:
                         "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
                         "ndcg1-test-target-rnn", "ndcg1-test-rnn-extr", "ndcg1-test-target-extr", "ndcg1-rnnw-rnn-extr",
                         "ndcg5-test-target-rnn", "ndcg5-test-rnn-extr", "ndcg5-test-target-extr",
-                        "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
+                        "ndcg5-rnnw-rnn-extr",  # "l2dis-target-extr",
+                        "perprnn-test-rnn", "perprnn-test-extr", "perprnn-rnnw-rnn", "perprnn-rnnw-extr"
                         ]
         else:
             measures = ["kld-test-rnn-extr",
@@ -539,7 +578,8 @@ class Spex:
                         "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",
                         "ndcg1-test-rnn-extr", "ndcg1-rnnw-rnn-extr",
                         "ndcg5-test-rnn-extr",
-                        "ndcg5-rnnw-rnn-extr"  # , "l2dis-target-extr"
+                        "ndcg5-rnnw-rnn-extr",
+                        "perprnn-test-rnn", "perprnn-test-extr", "perprnn-rnnw-rnn", "perprnn-rnnw-extr"
                         ]
         if ranks is None:
             ranks = self.ranks
@@ -575,7 +615,7 @@ class Spex:
         print("+", "-" * (mlen - 1), "+", ("-" * width + "+") * len(ranks), sep="")
 
     def print_last_extr_metrics(self):
-        if self.metrics_calc_level > 1 :
+        if self.metrics_calc_level > 1:
             print("\tPerplexity on test file : ")
             print("\t\t********\tTarget :\t{0}\n"
                   "\t\t********\tRNN :\t{1}\t{2:5.4f}\n"
@@ -670,6 +710,18 @@ class Spex:
             # print("\tl2-dist :")
             # print("\t\t********\tTarget-Extr :\t{0}"
             #       .format(self.l2dis_target_extr))
+            print("\tPerplexity with RNN as reference on test file : ")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t({1:5.2f}%)\tExtr :\t{2}\t{3:5.4f}"
+                  .format(self.perprnn_test_rnn,
+                          100 * self.eps_test_zeros_extr, self.perprnn_test_extr,
+                          (self.perprnn_test_rnn / self.perprnn_test_extr)))
+            print("\tPerplexity with RNN as reference on RNN-generated words : ")
+            print("\t\t********\tRNN :\t{0}\n"
+                  "\t\t({1:5.2f}%)\tExtr :\t{2}\t{3:5.4f}"
+                  .format(self.perprnn_rnnw_rnn,
+                          100 * self.eps_rnnw_zeros_extr, self.perprnn_rnnw_extr,
+                          (self.perprnn_rnnw_rnn / self.perprnn_rnnw_extr)))
 
     def hankels(self):
         return []
@@ -1015,7 +1067,7 @@ def gen_rnn(model, seeds=list([[]]), nb_per_seed=1, maxlen=50, patience=50, quie
                         # print("couic la colonne de padding !")
                         probas = np.delete(probas, 0, axis=1)
                     # We also remove the "begin" symbol, as it is not a valid choice
-                    probas = np.delete(probas, 4, axis=1)
+                    probas = np.delete(probas, nalpha, axis=1)
                     probas = probas[0]
                     # Normalize it, because we made some deletions:
                     s = sum(probas)

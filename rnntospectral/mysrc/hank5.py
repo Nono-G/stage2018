@@ -12,6 +12,9 @@ from hank3 import SpexRandDrop, words_task
 class SpexRandRNNW(SpexRandDrop):
     def __init__(self, modelfilestring, pref_drop, suff_drop, m_test_set="", met_model="", context=""):
         SpexRandDrop.__init__(self, modelfilestring, 1, 1, pref_drop, suff_drop, m_test_set, met_model, context)
+        self.temp_coeff = 1
+        self.truncate = 10
+        # self.randwords_maxlen = 10
 
     def gen_words_indexes_as_lists_para(self):
         nb_pref = self.pref_drop
@@ -20,12 +23,17 @@ class SpexRandRNNW(SpexRandDrop):
         hushed_words = set()
         hushed_prefixes = set()
         hushed_suffixes = set()
-        # random.seed()
+        # random.seed
+
+        if self.truncate != -1:
+            length_limit = self.truncate
+        else:
+            length_limit = self.randwords_maxlen
         failed_words = 0
         while (len(hushed_prefixes) < nb_pref or len(hushed_suffixes) < nb_suff) and failed_words < self.patience:
             word = list()
             enc_word = parse.pad_0([self.nalpha + 1], self.pad)  # Begin symbol, padded
-            while ((len(word) == 0) or (word[-1] != self.nalpha)) and len(word) <= self.randwords_maxlen:
+            while ((len(word) == 0) or (word[-1] != self.nalpha)) and len(word) <= length_limit:
                 try:
                     probas = self.prelim_dict[tuple(word)]
                 except KeyError:
@@ -34,12 +42,17 @@ class SpexRandRNNW(SpexRandDrop):
                         # "couic la colonne de padding !"
                         probas = np.delete(probas, 0, axis=1)
                     # We also remove the "begin" symbol, as it is not a valid choice
-                    probas = np.delete(probas, 4, axis=1)
+                    probas = np.delete(probas, self.nalpha, axis=1)
                     probas = probas[0]  # Unwrap the predicted singleton
                     # Normalize it, because we made some deletions:
                     s = sum(probas)
                     probas = [p / s for p in probas]
-                    self.prelim_dict[tuple(word)] = probas
+                    self.prelim_dict[self.hush.encode(word)] = probas
+                # TEMP TEMP TEMP
+                probas[self.nalpha] *= self.temp_coeff ** len(word)
+                s = sum(probas)
+                probas = [p / s for p in probas]
+                # TEMP TEMP TEMP
                 i = np.asscalar(np.random.choice(len(probas), 1, p=probas)[0])
                 word += [i]
                 enc_word = enc_word[1:] + [i + 1]
@@ -55,7 +68,18 @@ class SpexRandRNNW(SpexRandDrop):
                 else:
                     failed_words += 1
             else:
-                failed_words += 1
+                if self.truncate == -1:
+                    failed_words += 1
+                else:
+                    coded_word = self.hush.encode(word)
+                    if coded_word not in hushed_words:
+                        failed_words = 0  # Reset patience counter
+                        hushed_words.add(coded_word)
+                        hushed_prefixes.add(coded_word)
+                        hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
+                        hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
+                    else:
+                        failed_words += 1
         if failed_words == self.patience:
             pr(self.quiet, "\t\tRun out of patience !")
         pr(self.quiet,
@@ -105,11 +129,13 @@ if __name__ == "__main__":
     arg_ranks = [int(e) for e in sys.argv[2].split(sep="_")]
     arg_nb_pref = float(sys.argv[3])
     arg_nb_suffs = float(sys.argv[4])
-    if len(sys.argv) >= 9:
+    if len(sys.argv) >= 6:
         arg_testfile = sys.argv[5]
-        arg_aut_model = sys.argv[6]
     else:
         arg_testfile = ""
+    if len(sys.argv) >= 7:
+        arg_aut_model = sys.argv[6]
+    else:
         arg_aut_model = ""
 
     spex = SpexRandRNNW(arg_model, arg_nb_suffs, arg_nb_pref, arg_testfile, arg_aut_model, context_a)

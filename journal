@@ -885,7 +885,7 @@ On est globalement bons un peu partout mais mauvais sur 2 ou trois problèmes (t
 pas encore d'interprétation ou d'explication pour les cas particuliers où ça fonctionne si mal.
 
 
-Jeudi 3 Mai : 10h - 18h
+Jeudi 3 Mai : 10h - 18h30
 Base de suffixes plutot que de préfixes pour S. Chantier en cours.
 Je commence par une fonction dans Hush pour faire (code ---> {ens des suffixes}) sans passer par un
 décodage, ça fera gagner du temps. Ok ça marche. Maintenant on s'en sert dans hank3 pour faire une
@@ -913,25 +913,98 @@ SPICE : 4, 7, 8 (10, 6)
 Je vais lancer les apprentissages de RNN sur ces problèmes, on verra plus tard pour les extractions.
 Le super résultat sur le pb9 donne envie de tout refaire avec la nouvelle méthode, ça demandera du
 temps, et il faut faire quelques expés avant pour déterminer les tailles raisonnables de bases.
-SPICE : jobs 1712666 ==> 1712701
+SPICE : jobs 1712702 ==> 1712737 (Cette fois sur GPU car on est un peu préssés)
 
-Vendredi 4 Mai : (sncf)
+Vendredi 4 Mai : 9h-12h30 (sncf)
+RNNs Spice : 18/36 ont fini, surtout sur les pb 4 et 7, ça prends un peu plus de temps que ce que
+j'imaginais, même sur GPU. Du coup je doute de pouvoir relancer dès aujourd'hui les extractions.
+Il faudra trouver un peu de temps pour ça samedi aprem ?
+Du coup ça vaut pas vraiment le coup de lancer les extractions avec la nouvelle méthode, car les
+autres sont la priorité actuelle. En attendant on peut faire un peu de découpage plus propre autour
+de SPEX, pour faire les taches extractions et metriques séparément et mieux agencées.
+Ok tout ça c'est fait et plutot pas mal fait.
+Prelims dict ne fonctionnait pas car les mots y étaient stockés non pas sous forme de Hush mais de
+tuple de symboles, à corriger pour que ça refonctionne, mais pas le temps maintenant.
 
-Lundi 7 Mai :
-Mardi 8 Mai : ARMISTICE 45
-Mercredi 9 Mai :
+Lundi 7 Mai : 11h30 - ns yerba -18h30
+Relevé compteurs EDF à l'appart, donc je suis obligé d'arriver un peu tard. J'ai regardé dans le WE
+l'avancement des apprentissages de RNN, mais ils n'avaient pas fini, maintenant oui. Donc je vais
+lancer les extractions sur les problèmes SPICE aujourd'hui. Avant profitons-en pour régler ce petit
+bug de dictionnaire. Ok c'était très rapide =)
+Ok j'ai récupéré les meilleurs RNN, ils sont vers 1.6 pour pb4, 1.9 pour pb7 et pb8, c'est pas mal.
+Les meilleurs epochs sont a 9, 6 et 6, c'est un peu bête de s'être emmerdé avec 50 epochs mais au
+moins on est sûrs comme ça.
+Ok pour SPICE on a plus ou moins accès à des targets aussi, mais c'est un peu incompréhensible.
+HOULA ! Gros bug découvert ! à la sortie des prédictions du RNN, au lieu de supprimer la colonne
+"symbole de début" on supprimait systématiquement la colonne "4", qui n'est pas toujours (rarement
+meme) le symbole de début !!! Etrange que ça ait fonctionné quand même... Ok c'est réparé.
+Premières extractions sur les RNNs de Spice, pour l'instant c'est pas très encourageant... a essayer
+avec de gros blocs pour confirmer.
+Travaux sur Parse-Plot, je vais explorer un peu tout ça pour avoir des intuitions, ensuite on pourra
+choisir les graphiques intéréssants.
+Ok mes explorations sont intéréssantes, par exemple KLD et perplexité sont vraiment les mêmes choses
+à des échelles différentes.
+Extractions Spice lancées : 
+1713161 => 1713169
+
+Mardi 8 Mai : ARMISTICE 45 ~2h
+Rapide coup d'oeil maison, perplexité et kld sont très bien liées (à leurs échelles respectives) sur
+l'ensemble de test, idem pour les différentes variantes de NDCG. C'est bien ça devrait permettre 
+d'éliminer certaines métriques et de confirmer que celles qu'on à sur les problèmes SPICE sont
+suffisantes.
+Extractions SPICE pas finies, à demain.
+
+Mercredi 9 Mai : 10h30 - 17h
+Extractions chez SPICE toujours pas terminées, il reste environ 5h d'après lui, à voir en fin de
+journée.
+Kld-rand-extr-rnn (à l'envers) n'est pas une métrique très pertinente il semblerait : toujours assez
+bonne, même dans des cas ou la perplexité et les autres métriques sont très mauvaises. Perplexité et
+kld sur l'ensemble aléatoire ne sont pas très parlants non plus, et beaucoup moins clairement liés.
+
 Jeudi 10 Mai : ASCENSION
-Vendredi 11 Mai :
+Toujours pas fini, bizarre...
 
-Lundi 14 Mai :
+Vendredi 11 Mai : 9h30 - 12h30
+Réunion RE Saint charles. Beaucoup de choses.
+1713783 ==> 1713791 Spice
+
+Lundi 14 Mai : 9h -
+Première extr finie, petit bug à la fin mais ça empêche pas de récupérer les automates, ok.
+83 fini ok.
+84 en cours, devrait finir
+85 a à peine commencé ??? Ne finira pas
+86 Mort manque de mem après extr
+87 en cours, devrait finir
+88 comme 85
+89 en cours, devrait finir
+90 mem error
+91 mem error
+Je rajoute une nouvelle métrique, la perplexité du rnn sur lui même sur ses mots et ceux de test, et
+la même chose pour l'extrait. Possibilité de faire des métriques sans extractions a partir des auts.
+Réunion RE et SA : Des choses sur l'ecriture la mise en page, ...
+Chose a faire par moi : comme d'hab sur spice 4, 10, et pautartif 2. Eventuellement on tronque les
+mots a une certaine longueur pour eviter d'avoir de trop gros blocs a passer. Vérifier retour 83
+quand on aura les metriques séparéments du reste.
+Je profite de refaire l'entrainement pour séparer à la main le train en deux pour avoir un ensemble
+de test différent. J'en lance un sur cluster, et l'autre en local, ça fera gagner du temps.
+Et ben au final, le local a fini (alors que je l'ai lancé une heure après), puis j'ai lancé en local
+celui du cluster, et quand il l'a doublé, j'ai coupé le cluster. Ya vraiment un problème de perfs.
+OK pour metriques séparément du reste. Ok pour RNNPerp.
+Je teste la troncation brutale pour les mots de la base générés par RNN.
+Ok pour des tables en LATEX (table, tabular) ça a l'air pas trop compliqué, on va pouvoir faire des
+tableaux dans tous les coins !
+
 Mardi 15 Mai :
 Mercredi 16 Mai :
-Jeudi 17 Mai : GT?
+
+Jeudi 17 Mai :
+Je pars en début d'aprem.
+
 Vendredi 18 Mai : GT (sncf)
 
 Lundi 21 Mai : PENTECOTE
 Mardi 22 Mai : GT
-Mercredi 23 Mai : GT?
+Mercredi 23 Mai :
 Jeudi 24 Mai :
 Vendredi 25 Mai :
 
@@ -939,22 +1012,22 @@ Lundi 28 Mai :
 Mardi 29 Mai :
 Mercredi 30 Mai :
 Jeudi 31 Mai :
-Vendredi 1 Juin :
+Vendredi 1 Juin : RESUME RAPRORT
 
-Lundi 4 Juin :
+Lundi 4 Juin :RAPPORT DEFINITIF
 Mardi 5 Juin :
-Mercredi 6 Juin : RESUME RAPPORT
+Mercredi 6 Juin :
 Jeudi 7 Juin :
 Vendredi 8 Juin : (sncf)
 
-Lundi 11 Juin : RAPPORT DEFINITIF ?
-Mardi 12 Juin : RAPPORT DEFINITIF ?
+Lundi 11 Juin : SOUTENANCE
+Mardi 12 Juin :
 Mercredi 13 Juin :
 Jeudi 14 Juin :
 Vendredi 15 Juin :
 
 Lundi 18 Juin :
-Mardi 19 Juin : SOUTENANCE
+Mardi 19 Juin :
 Mercredi 20 Juin :
 Jeudi 21 Juin :
 Vendredi 22 Juin : (sncf)

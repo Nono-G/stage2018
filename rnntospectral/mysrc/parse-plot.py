@@ -35,12 +35,21 @@ def parse_one(filename, idn, dico, dico_context):
             for i, r in enumerate(ranks):
                 dico[idn + "--" + str(r)].append(float(spl[i]))
             line = file.readline()
-        print(idn, "=", context)
         try:
-            dico_context[idn] = (int(context.split(sep="-")[0].split(sep="+")[1][1:]),)
+            dico_context[idn] = parse_context_string(context)
         except Exception:
             print(idn, "Error when parsing context")
+        print(idn, "=", context)
         return 0
+
+
+def parse_context_string(context):
+    pb = int(context.split(sep="-")[0].split(sep="+")[1][1:])
+    prefs = int(context.split(sep="(")[1].split(sep=")")[0])
+    suffs = int(context.split(sep="(")[2].split(sep=")")[0])
+    l_prefs = context.split(sep="(")[0].split(sep="l")[-1]
+    l_suffs = context.split(sep="(")[1].split(sep="c")[-1]
+    return pb, prefs, suffs, l_prefs, l_suffs
 
 
 def plot_some(dico, files, caracs, ranks=None):
@@ -142,20 +151,90 @@ def plot_overall_perp(dico, dico_context, arg_problems=None, ranks=None):
     mpl.show()
 
 
+def plot_some_appart(dico, context_dico, pb, caracs_chunks, ranks):
+    mpl.figure(1)
+    data = []
+    done = set()
+    for key in dico.keys():
+        idn,rk = key.split(sep="--")
+        rk = int(rk)
+        if idn not in done and context_dico[idn][0] == pb:
+            done.add(idn)
+            data.append([context_dico[idn],[]])
+            for carch in caracs_chunks:
+                data[-1][1].append([])
+                for car in carch:
+                    data[-1][1][-1].append([])
+                    for r in ranks:
+                        data[-1][1][-1][-1].append(dico[idn+"--"+str(r)][car])
+    for i in range(len(caracs_chunks)):
+        mpl.subplot((100*len(caracs_chunks)+11)+i)
+        for c in range(len(caracs_chunks[i])):
+            for j in range(len(data)):
+                mpl.plot(ranks, [data[j][1][i][c][rk] for rk in range(len(ranks))], "x-")
+        mpl.gca().set_title([mmm[car] for car in caracs_chunks[i]])
+        # mpl.gca().set_xlabel("Rank")
+        mpl.legend([str(data[j][0][1:])+":"+str(mmm[car]) for car in caracs_chunks[i] for j in range(len(data))],
+                   bbox_to_anchor=(1, 1), loc=2, borderaxespad=0., prop={'size':6})
+    # mpl.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+    mpl.tight_layout()
+    mpl.subplots_adjust(left=0.03, right=0.85, hspace=0.15, bottom=0.05)
+    mpl.gcf().suptitle("Problem {0}".format(pb))
+    mpl.show()
+
+
+def parse_some(input_line, files):
+    if input_line == "Q":
+        return 0
+    elif input_line == "1-*":
+        xxx = "extr1/OAR. 1709031 .stdout 288 1 0 1"
+        print(xxx)
+        return parse_some(xxx, files)
+    elif input_line == "2-*":
+        xxx = "extr2/OAR. 1710850 .stdout 432 1 0 1"
+        print(xxx)
+        return parse_some(xxx, files)
+    else:
+        splt = input_line.split()
+        if len(splt) != 7:
+            print("ERROR, expected : prefix n suffix total batch phase period")
+            return -1
+        pref = splt[0]
+        n = int(splt[1])
+        suff = splt[2]
+        total = int(splt[3])
+        batch = int(splt[4])
+        phase = int(splt[5])
+        period = int(splt[6])
+        # start_r = int(splt[7])
+        # end_r = int(splt[8])
+        for i__ in range(total):
+            for k__ in range(batch):
+                files.append(pref + str(n + phase + k__ + i__ * period) + suff)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 8:
-        print("prefix n suffix nb step start-rank end-rank")
-        exit(-666)
-    pref = sys.argv[1]
-    n = int(sys.argv[2])
-    suff = sys.argv[3]
-    nb = int(sys.argv[4])
-    step = int(sys.argv[5])
-    start_r = int(sys.argv[6])
-    end_r = int(sys.argv[7])
+    # if len(sys.argv) != 10:
+    #     print("prefix n suffix total batch phase period start-rank end-rank")
+    #     exit(-666)
+    # pref = sys.argv[1]
+    # n = int(sys.argv[2])
+    # suff = sys.argv[3]
+    # total = int(sys.argv[4])
+    # batch = int(sys.argv[5])
+    # phase = int(sys.argv[6])
+    # period = int(sys.argv[7])
+    # start_r = int(sys.argv[8])
+    # end_r = int(sys.argv[9])
+    start_r = int(sys.argv[1])
+    end_r = int(sys.argv[2])
+    rank_range = range(start_r, end_r+1)
     filezz = []
-    for i in range(nb):
-        filezz.append(pref + str(n + i * step) + suff)
+    while parse_some(input(), filezz) != 0:
+        pass  # Effets de bords =)
+    # for i__ in range(total):
+    #     for k__ in range(batch):
+    #         filezz.append(pref + str(n + phase + k__ + i__ * period) + suff)
     d = dict()
     d2 = dict()
     file_number = 0
@@ -168,10 +247,15 @@ if __name__ == "__main__":
         file_number += 1
     # plot_overall(d)
     # plot_overall_perp(d, d2, problems=[i for i in range(1,30) if i not in [5, 20,21,22,23]])
+    # plot_some_appart(d, d2, 3, [[2], [7], [25]], rank_range)
     plot_overall_perp(d, d2)
-    plot_some(d, parsed, [2, 25])
-    plot_some(d, parsed, [2, 25])
-    plot_some(d, parsed, [2, 11, 12])
+    # plot_some(d, parsed, [2, 25])
+    # plot_some(d, parsed, [2, 25])
+    # plot_some(d, parsed, [2, 11, 12])
+
+    problems = set([x[0] for x in d2.values()])
+    for pb in problems:
+        plot_some_appart(d, d2, pb, [[2],[7], [21], [25]], rank_range)
     # plot_some(d, parsed, [0, 1, 2], ranks=range(start_r, end_r))
     # plot_some(d, parsed, [1, 2], ranks=range(start_r, end_r))
     # plot_some(d, parsed, [25], ranks=range(start_r, end_r))

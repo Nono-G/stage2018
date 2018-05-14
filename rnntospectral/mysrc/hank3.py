@@ -114,6 +114,7 @@ class SpexRandDrop(SpexHush):
         suffs_preds = self.rnn_model.predict_generator(g, steps, verbose=(0 if self.quiet else 1))
         if suffs_preds.shape[1] > self.nalpha + 2:
             suffs_preds = np.delete(suffs_preds, 0, axis=1)
+        suffs_preds = np.delete(suffs_preds, self.nalpha, axis=1)
         suffs_dict = dict(self.prelim_dict)
         for k in range(len(suffs_batch)):
             suffs_dict[suffs_batch[k]] = suffs_preds[k]
@@ -134,6 +135,7 @@ class SpexRandDrop(SpexHush):
         # preds1 = np.array(preds1)
         # t2 = time.time()
         # print("dT : {0}".format((t2 - t1)))
+
         # # THREADING
         # t1 = time.time()
         # preds2 = np.array([])
@@ -150,11 +152,12 @@ class SpexRandDrop(SpexHush):
         # del words_chunks
         # t2 = time.time()
         # print("dT : {0}".format((t2 - t1)))
+
         # # LINEAR
         # t1 = time.time()
         preds3 = np.empty(len(words))
         for i in range(len(words)):
-            word = self.hush.decode(words[i]) + [self.nalpha + 1]
+            word = self.hush.decode(words[i]) + [self.nalpha]
             pcode = sorted(list(self.hush.prefixes_codes(words[i]))) + [words[i]]
             acc = 1.0
             for k in range(len(word)):
