@@ -13,7 +13,7 @@ class SpexRandRNNW(SpexRandDrop):
     def __init__(self, modelfilestring, pref_drop, suff_drop, m_test_set="", met_model="", context=""):
         SpexRandDrop.__init__(self, modelfilestring, 1, 1, pref_drop, suff_drop, m_test_set, met_model, context)
         self.temp_coeff = 1
-        self.truncate = 10
+        self.truncate = 20
         # self.randwords_maxlen = 10
 
     def gen_words_indexes_as_lists_para(self):
@@ -62,9 +62,11 @@ class SpexRandRNNW(SpexRandDrop):
                 if coded_word not in hushed_words:
                     failed_words = 0  # Reset patience counter
                     hushed_words.add(coded_word)
-                    hushed_prefixes.add(coded_word)
-                    hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
-                    hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
+                    if len(hushed_prefixes) < nb_pref:
+                        hushed_prefixes.add(coded_word)
+                        hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
+                    if len(hushed_suffixes) < nb_suff:
+                        hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
                 else:
                     failed_words += 1
             else:
@@ -75,9 +77,11 @@ class SpexRandRNNW(SpexRandDrop):
                     if coded_word not in hushed_words:
                         failed_words = 0  # Reset patience counter
                         hushed_words.add(coded_word)
-                        hushed_prefixes.add(coded_word)
-                        hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
-                        hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
+                        if len(hushed_prefixes) < nb_pref:
+                            hushed_prefixes.add(coded_word)
+                            hushed_prefixes.update(self.hush.prefixes_codes(coded_word))
+                        if len(hushed_suffixes) < nb_suff:
+                            hushed_suffixes.update(self.hush.suffixes_codes(coded_word))
                     else:
                         failed_words += 1
         if failed_words == self.patience:
@@ -119,7 +123,7 @@ if __name__ == "__main__":
               .format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
-    context_a = ("H5-{0}ln{1}cn{2}"
+    context_a = ("H5-{0}l{1}c{2}"
                  .format(sys.argv[1], sys.argv[3], sys.argv[4])
                  .replace(" ", "_")
                  .replace("/", "+"))

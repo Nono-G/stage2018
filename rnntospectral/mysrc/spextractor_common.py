@@ -545,10 +545,10 @@ class Spex:
         self.metrics[(rank, "ndcg5-rnnw-rnn-extr")] = self.ndcg5_rnnw_rnn_extr
         # self.metrics[(rank, "l2dis-target-extr")] = self.l2dis_target_extr
         self.metrics[(rank, "perprnn-test-rnn")] = self.perprnn_test_rnn
-        self.metrics[(rank, "perprnn-test-rnn-eps")] = self.eps_test_zeros_extr
+        self.metrics[(rank, "perprnn-test-extr-eps")] = self.eps_test_zeros_extr
         self.metrics[(rank, "perprnn-test-extr")] = self.perprnn_test_extr
         self.metrics[(rank, "perprnn-rnnw-rnn")] = self.perprnn_rnnw_rnn
-        self.metrics[(rank, "perprnn-rnnw-rnn-eps")] = self.eps_rnnw_zeros_extr
+        self.metrics[(rank, "perprnn-rnnw-extr-eps")] = self.eps_rnnw_zeros_extr
         self.metrics[(rank, "perprnn-rnnw-extr")] = self.perprnn_rnnw_extr
 
 
@@ -583,6 +583,7 @@ class Spex:
                         ]
         if ranks is None:
             ranks = self.ranks
+        ranks = sorted(ranks)
         mlen = max([len(m) for m in measures])+3
         width = 23
         print(self.context)
