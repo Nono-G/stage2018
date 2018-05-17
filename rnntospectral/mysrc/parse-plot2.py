@@ -1,6 +1,6 @@
-import matplotlib.pyplot as mpl
+import matplotlib.pyplot as plt
 import mpl_toolkits.axes_grid1 as host
-from matplotlib import rc
+import matplotlib as mpl
 import sys
 import numpy as np
 from math import log
@@ -18,10 +18,10 @@ mmm = ["perp-test-target", "perp-test-rnn", "perp-test-extr",  # 0 1 2
        # "l2dis-target-extr"
        ]  # 26
 
-smm = ["kld-test-rnn-extr",  # 1
-       "(1-wer)-test-rnn", "(1-wer)-test-extr",  # 2 3
-       "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",  # 4 5
-       "ndcg1-test-rnn-extr", "ndcg1-rnnw-rnn-extr",  # 6
+smm = ["kld-test-rnn-extr",  # 0
+       "(1-wer)-test-rnn", "(1-wer)-test-extr",  # 1 2
+       "(1-wer)-rnnw-rnn", "(1-wer)-rnnw-extr",  # 3 4
+       "ndcg1-test-rnn-extr", "ndcg1-rnnw-rnn-extr",  # 5 6
        "ndcg5-test-rnn-extr",  # 7
        "ndcg5-rnnw-rnn-extr",  # 8
        "perprnn-test-rnn", "perprnn-test-extr", "perprnn-rnnw-rnn", "perprnn-rnnw-extr"  # 9 10 11 12
@@ -86,10 +86,10 @@ def plot_some(dico, files, caracs, ranks=None):
         for c in caracs:
             abss = [k.split(sep="--")[1] for k in keys if (ranks is None or int(k.split(sep="--")[1]) in ranks)]
             ords = [dico[k][c] for k in keys if (ranks is None or int(k.split(sep="--")[1]) in ranks)]
-            mpl.plot(abss, ords,"+-", label="carac"+str(c))
+            plt.plot(abss, ords, "+-", label="carac" + str(c))
         leg += [file + ":" + mmm[c] for c in caracs]
-    mpl.legend(leg)
-    mpl.show()
+    plt.legend(leg)
+    plt.show()
 
 
 def plot_pca(dico, files, ranks=None, caracs=None):
@@ -105,9 +105,9 @@ def plot_pca(dico, files, ranks=None, caracs=None):
                 if ranks is None or int(key_split[1]) in ranks:
                     data.append([dico[k][c] for c in caracs])
         data = pca.transform(data)
-        mpl.scatter(data[:, [0]], data[:, [1]])
-    mpl.legend(files)
-    mpl.show()
+        plt.scatter(data[:, [0]], data[:, [1]])
+    plt.legend(files)
+    plt.show()
 
 
 def plot_overall(dico):
@@ -128,10 +128,10 @@ def plot_overall(dico):
     print(data)
     leg = []
     for k in range(len(problems)):
-        mpl.scatter(problems, data[:, [k]])
+        plt.scatter(problems, data[:, [k]])
         leg.append(mmm[caracs[k]])
-    mpl.legend(leg)
-    mpl.show()
+    plt.legend(leg)
+    plt.show()
 
 
 def plot_overall_perp(dico, dico_context, arg_problems=None, ranks=None):
@@ -167,18 +167,18 @@ def plot_overall_perp(dico, dico_context, arg_problems=None, ranks=None):
             todel.append(j-len(todel))
     for j in todel:
         del problems[j]
-    mpl.scatter(problems, [rel_data[pr][0] for pr in problems])
-    mpl.scatter(problems, [rel_data[pr][1] for pr in problems])
+    plt.scatter(problems, [rel_data[pr][0] for pr in problems])
+    plt.scatter(problems, [rel_data[pr][1] for pr in problems])
     # mpl.scatter(problems, data[:, [3]])
-    mpl.legend(["r/t", "e/r", "ndcg5"])
+    plt.legend(["r/t", "e/r", "ndcg5"])
     print([data[pr][4] for pr in problems])
     print([data[pr][5]+1 for pr in problems])
-    mpl.grid()
-    mpl.show()
+    plt.grid()
+    plt.show()
 
 
 def plot_some_appart(dico, context_dico, pb, caracs_chunks, ranks):
-    mpl.figure(1)
+    plt.figure(1)
     data = []
     done = set()
     for (idn,rk) in dico.keys():
@@ -194,19 +194,19 @@ def plot_some_appart(dico, context_dico, pb, caracs_chunks, ranks):
                     for r in ranks:
                         data[-1][1][-1][-1].append(dico[(idn,r)][car])
     for i in range(len(caracs_chunks)):
-        mpl.subplot((100*len(caracs_chunks)+11)+i)
+        plt.subplot((100 * len(caracs_chunks) + 11) + i)
         for c in range(len(caracs_chunks[i])):
             for j in range(len(data)):
-                mpl.plot(ranks, [data[j][1][i][c][rk] for rk in range(len(ranks))], "x-")
-        mpl.gca().set_title([mmm[car] for car in caracs_chunks[i]])
+                plt.plot(ranks, [data[j][1][i][c][rk] for rk in range(len(ranks))], "x-")
+        plt.gca().set_title([mmm[car] for car in caracs_chunks[i]])
         # mpl.gca().set_xlabel("Rank")
-        mpl.legend([str(data[j][0][1:])+":"+str(mmm[car]) for car in caracs_chunks[i] for j in range(len(data))],
+        plt.legend([str(data[j][0][1:]) + ":" + str(mmm[car]) for car in caracs_chunks[i] for j in range(len(data))],
                    bbox_to_anchor=(1, 1), loc=2, borderaxespad=0., prop={'size':6})
     # mpl.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
-    mpl.tight_layout()
-    mpl.subplots_adjust(left=0.03, right=0.85, hspace=0.15, bottom=0.05)
-    mpl.gcf().suptitle("Problem {0}".format(pb))
-    mpl.show()
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.03, right=0.85, hspace=0.15, bottom=0.05)
+    plt.gcf().suptitle("Problem {0}".format(pb))
+    plt.show()
 
 
 def parse_some(input_line, files):
@@ -287,6 +287,7 @@ def latex_best_test(dic, cdic, edic, problems):
     print("\\end{table}")
     print("")
 
+
 def fabulous_four(dic, cdic, problems, opt=0):
     bests_perp_t = []
     bests_ndcg_t = []
@@ -323,38 +324,38 @@ def fabulous_four(dic, cdic, problems, opt=0):
         bests_ndcg_t = bests_ndcg_r
         bests_perp_r = bests_ndcg_r
         # bests_ndcg_r = bests_ndcg_r
-    mpl.figure(1).suptitle(titles[opt])
+    plt.figure(1).suptitle(titles[opt])
     if opt == 1:
-        rc('axes', linewidth=3)
-    mpl.subplot(221).set_title("Perplexity Ratio")
-    mpl.gca().xaxis.grid(True)
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][1] / dic[bests_perp_t[i]][2] for i in range(len(problems))])
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][0]/dic[bests_perp_t[i]][1] for i in range(len(problems))], marker="+")
-    mpl.ylabel("on $S_{test}$")
-    mpl.legend(["RNN/WA","Target/RNN"])
-    rc('axes', linewidth=1)
+        mpl.rc('axes', linewidth=3)
+    plt.subplot(221).set_title("Perplexity Ratio")
+    plt.gca().xaxis.grid(True)
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][1] / dic[bests_perp_t[i]][2] for i in range(len(problems))])
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][0] / dic[bests_perp_t[i]][1] for i in range(len(problems))], marker="+")
+    plt.ylabel("on $S_{test}$")
+    plt.legend(["RNN/WA", "Target/RNN"])
+    mpl.rc('axes', linewidth=1)
     if opt == 2:
-        rc('axes', linewidth=3)
-    mpl.subplot(222).set_title("NDCG-5")
-    mpl.gca().xaxis.grid(True)
-    mpl.scatter(problems, [dic[bests_ndcg_t[i]][24] for i in range(len(problems))])
+        mpl.rc('axes', linewidth=3)
+    plt.subplot(222).set_title("NDCG-5")
+    plt.gca().xaxis.grid(True)
+    plt.scatter(problems, [dic[bests_ndcg_t[i]][24] for i in range(len(problems))])
     # mpl.legend(["ndcg5-rnn-extr"])
-    rc('axes', linewidth=1)
+    mpl.rc('axes', linewidth=1)
     if opt == 3:
-        rc('axes', linewidth=3)
-    mpl.subplot(223)
-    mpl.gca().xaxis.grid(True)
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_r[i]][28] / dic[bests_perp_r[i]][29] for i in range(len(problems))])
-    mpl.ylabel('on $S_{RNN}$')
-    rc('axes', linewidth=1)
+        mpl.rc('axes', linewidth=3)
+    plt.subplot(223)
+    plt.gca().xaxis.grid(True)
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_r[i]][28] / dic[bests_perp_r[i]][29] for i in range(len(problems))])
+    plt.ylabel('on $S_{RNN}$')
+    mpl.rc('axes', linewidth=1)
     if opt == 4:
-        rc('axes', linewidth=3)
-    mpl.subplot(224)
-    mpl.gca().xaxis.grid(True)
-    mpl.scatter(problems, [dic[bests_ndcg_r[i]][25] for i in range(len(problems))])
-    rc('axes', linewidth=1)
+        mpl.rc('axes', linewidth=3)
+    plt.subplot(224)
+    plt.gca().xaxis.grid(True)
+    plt.scatter(problems, [dic[bests_ndcg_r[i]][25] for i in range(len(problems))])
+    mpl.rc('axes', linewidth=1)
     # mpl.legend(["ndcg5-rnn-extr"])
-    mpl.show()
+    plt.show()
 
 
 def fabulous_four_hist(dic, cdic, problems, opt=0):
@@ -394,55 +395,147 @@ def fabulous_four_hist(dic, cdic, problems, opt=0):
         bests_ndcg_t = bests_ndcg_r
         bests_perp_r = bests_ndcg_r
         # bests_ndcg_r = bests_ndcg_r
-    mpl.figure(1)  # .suptitle(titles[opt])
-    mpl.gca().grid(True)
+    plt.figure(1)  # .suptitle(titles[opt])
+    plt.subplots_adjust(left=0.07, bottom=0.09, right=0.98, top=0.95, wspace=0.16, hspace=0.46)
+    plt.gca().grid(True)
     if opt == 1:
-        rc('axes', linewidth=3)
-    sb1 = mpl.subplot(221)
+        mpl.rc('axes', linewidth=3)
+    sb1 = plt.subplot(221)
     sb1.set_title("on $S_{test}$")
-    mpl.gca().xaxis.grid(True)
-    mpl.xlabel("Problem")
-    mpl.ylabel("Perplexity Ratio")
+    plt.gca().xaxis.grid(True)
+    plt.xlabel("PAutomaC problem")
+    plt.ylabel("Perplexity Ratio")
     sb1.set_ylim(0, 1.1)
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][1] / dic[bests_perp_t[i]][2] for i in range(len(problems))])
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][0]/dic[bests_perp_t[i]][1] for i in range(len(problems))], marker="+")
-    mpl.legend(["RNN/WA","Target/RNN"])
-    rc('axes', linewidth=1)
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][1] / dic[bests_perp_t[i]][2] for i in range(len(problems))])
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_t[i]][0] / dic[bests_perp_t[i]][1] for i in range(len(problems))], marker="s")
+    plt.legend(["RNN/WA", "Target/RNN"])
+    mpl.rc('axes', linewidth=1)
     if opt == 2:
-        rc('axes', linewidth=3)
-    sb2 = mpl.subplot(222)
+        mpl.rc('axes', linewidth=3)
+    sb2 = plt.subplot(222)
     sb2.set_title("on $S_{test}$")
-    mpl.xlabel("NDCG-5")
-    mpl.ylabel("# of problems")
-    mpl.xticks(np.arange(0, 1.1, step=0.1), [str(int(100*x))+"%" for x in np.arange(0, 1.1, step=0.1)])
+    plt.xlabel("NDCG$_5$")
+    plt.ylabel("# of problems")
+    plt.xticks(np.arange(0, 1.1, step=0.1))
     # mpl.gca().xaxis.grid(True)
     # mpl.scatter(problems, [dic[bests_ndcg_t[i]][24] for i in range(len(problems))])
-    mpl.hist([dic[bests_ndcg_t[i]][24] for i in range(len(problems))], steps, rwidth=0.8)
+    plt.hist([dic[bests_ndcg_t[i]][24] for i in range(len(problems))], steps, rwidth=0.8)
     # mpl.legend(["ndcg5-rnn-extr"])
-    rc('axes', linewidth=1)
+    mpl.rc('axes', linewidth=1)
     if opt == 3:
-        rc('axes', linewidth=3)
-    sb3 = mpl.subplot(223)
+        mpl.rc('axes', linewidth=3)
+    sb3 = plt.subplot(223)
     sb3.set_title("on $S_{RNN}$")
     sb3.set_ylim(0, 1.1)
-    mpl.xlabel("Problem")
-    mpl.gca().xaxis.grid(True)
-    mpl.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_r[i]][28] / dic[bests_perp_r[i]][29] for i in range(len(problems))])
-    mpl.ylabel("Perplexity Ratio")
-    rc('axes', linewidth=1)
+    plt.xlabel("PAutomaC problem")
+    plt.gca().xaxis.grid(True)
+    plt.scatter([problems[i] for i in range(len(problems))], [dic[bests_perp_r[i]][28] / dic[bests_perp_r[i]][29] for i in range(len(problems))])
+    plt.ylabel("Perplexity Ratio")
+    mpl.rc('axes', linewidth=1)
     if opt == 4:
-        rc('axes', linewidth=3)
-    sb4 = mpl.subplot(224)
+        mpl.rc('axes', linewidth=3)
+    sb4 = plt.subplot(224)
     sb4.set_title("on $S_{RNN}$")
-    mpl.xlabel("NDCG-5")
-    mpl.ylabel("# of problems")
-    mpl.xticks(np.arange(0, 1.1, step=0.1), [str(int(100 * x)) + "%" for x in np.arange(0, 1.1, step=0.1)])
+    plt.xlabel("NDCG$_5$")
+    plt.ylabel("# of problems")
+    plt.xticks(np.arange(0, 1.1, step=0.1))
     # mpl.gca().xaxis.grid(True)
     # mpl.scatter(problems, [dic[bests_ndcg_r[i]][25] for i in range(len(problems))])
-    mpl.hist([dic[bests_ndcg_r[i]][25] for i in range(len(problems))], steps, rwidth=0.8)
-    rc('axes', linewidth=1)
+    plt.hist([dic[bests_ndcg_r[i]][25] for i in range(len(problems))], steps, rwidth=0.8)
+    mpl.rc('axes', linewidth=1)
     # mpl.legend(["ndcg5-rnn-extr"])
-    mpl.show()
+    plt.show()
+
+
+def fabulous_four_hist_WER(dic, cdic, problems, opt=0):
+    steps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    bests_wer_t = []
+    bests_ndcg_t = []
+    bests_wer_r = []
+    bests_ndcg_r = []
+    # titles=["Overall best results on Pautomac",
+    #         "Results of best parameters for perplexity ratio on $S_{test}$",
+    #         "Results of best parameters for NDCG-5 on $S_{test}$",
+    #         "Results of best parameters for perplexity ratio on $S_{RNN}$",
+    #         "Results of best parameters for NDCG-5 on $S_{RNN}$"
+    #         ]
+    for pb in problems:
+        bests_wer_t.append(best(dic, cdic, (lambda o, n: o[15]-n[15]), pb))
+        bests_ndcg_t.append(best(dic, cdic, (lambda o, n: o[20]-n[20]), pb))
+        bests_wer_r.append(best(dic, cdic, (lambda o, n: o[17]-n[17]), pb))
+        bests_ndcg_r.append(best(dic, cdic, (lambda o, n: o[21]-n[21]), pb))
+    if opt == 1:
+        # bests_wer_t = bests_wer_t
+        bests_ndcg_t = bests_wer_t
+        bests_wer_r = bests_wer_t
+        bests_ndcg_r = bests_wer_t
+    if opt == 2:
+        bests_wer_t = bests_ndcg_t
+        # bests_ndcg_t = bests_ndcg_t
+        bests_wer_r = bests_ndcg_t
+        bests_ndcg_r = bests_ndcg_t
+    if opt == 3:
+        bests_wer_t = bests_wer_r
+        bests_ndcg_t = bests_wer_r
+        # bests_wer_r = bests_wer_r
+        bests_ndcg_r = bests_wer_r
+    if opt == 4:
+        bests_wer_t = bests_ndcg_r
+        bests_ndcg_t = bests_ndcg_r
+        bests_wer_r = bests_ndcg_r
+        # bests_ndcg_r = bests_ndcg_r
+    plt.figure(1)  # .suptitle(titles[opt])
+    plt.subplots_adjust(left=0.07, bottom=0.09, right=0.98, top=0.95, wspace=0.16, hspace=0.46)
+    plt.gca().grid(True)
+    if opt == 1:
+        mpl.rc('axes', linewidth=3)
+    sb1 = plt.subplot(221)
+    sb1.set_title("on $S_{test}$")
+    plt.gca().xaxis.grid(True)
+    plt.xlabel("PAutomaC problem")
+    plt.ylabel("Word Error Rate")
+    sb1.set_ylim(0, 1.1)
+    plt.scatter([problems[i] for i in range(len(problems))], [1-dic[bests_wer_t[i]][15] for i in range(len(problems))])
+    plt.scatter([problems[i] for i in range(len(problems))], [1-dic[bests_wer_t[i]][14] for i in range(len(problems))], marker="s")
+    plt.legend(["WA", "RNN"])
+    mpl.rc('axes', linewidth=1)
+    if opt == 2:
+        mpl.rc('axes', linewidth=3)
+    sb2 = plt.subplot(222)
+    sb2.set_title("on $S_{test}$")
+    plt.xlabel("NDCG$_1$")
+    plt.ylabel("# of problems")
+    plt.xticks(np.arange(0, 1.1, step=0.1))
+    # mpl.gca().xaxis.grid(True)
+    # mpl.scatter(problems, [dic[bests_ndcg_t[i]][24] for i in range(len(problems))])
+    plt.hist([dic[bests_ndcg_t[i]][24] for i in range(len(problems))], steps, rwidth=0.8)
+    # mpl.legend(["ndcg5-rnn-extr"])
+    mpl.rc('axes', linewidth=1)
+    if opt == 3:
+        mpl.rc('axes', linewidth=3)
+    sb3 = plt.subplot(223)
+    sb3.set_title("on $S_{RNN}$")
+    sb3.set_ylim(0, 1.1)
+    plt.xlabel("PAutomaC problem")
+    plt.gca().xaxis.grid(True)
+    plt.scatter([problems[i] for i in range(len(problems))], [1-dic[bests_wer_r[i]][17] for i in range(len(problems))])
+    plt.scatter([problems[i] for i in range(len(problems))], [1-dic[bests_wer_r[i]][16] for i in range(len(problems))], marker="s")
+    plt.legend(["WA", "RNN"])
+    plt.ylabel("Word Error Rate")
+    mpl.rc('axes', linewidth=1)
+    if opt == 4:
+        mpl.rc('axes', linewidth=3)
+    sb4 = plt.subplot(224)
+    sb4.set_title("on $S_{RNN}$")
+    plt.xlabel("NDCG$_1$")
+    plt.ylabel("# of problems")
+    plt.xticks(np.arange(0, 1.1, step=0.1))
+    # mpl.gca().xaxis.grid(True)
+    # mpl.scatter(problems, [dic[bests_ndcg_r[i]][25] for i in range(len(problems))])
+    plt.hist([dic[bests_ndcg_r[i]][25] for i in range(len(problems))], steps, rwidth=0.8)
+    mpl.rc('axes', linewidth=1)
+    # mpl.legend(["ndcg5-rnn-extr"])
+    plt.show()
 
 
 def details(fs):
@@ -453,31 +546,31 @@ def details(fs):
     for f in fs:
         parse_one(f,i,dic,cdic, edic)
         i += 1
-    mpl.figure().suptitle("Natural Problem : Spice 4")
-    mpl.subplot(311)
+    plt.figure().suptitle("Natural Problem : Spice 4")
+    plt.subplot(311)
     for k in range(0,i):
         ranks=set()
         for (idn, rk) in dic.keys():
             if idn == k:
                 ranks.add(rk)
-        mpl.plot(sorted(list(ranks)), [dic[(k,r)][11]/dic[(k,r)][12] for r in sorted(list(ranks))], "+-")
-        mpl.legend(["Perplexity ratio"])
-    mpl.subplot(312)
+        plt.plot(sorted(list(ranks)), [dic[(k, r)][11] / dic[(k, r)][12] for r in sorted(list(ranks))], "+-")
+        plt.legend(["Perplexity ratio"])
+    plt.subplot(312)
     # for k in range(0,i):
     #     ranks = set()
     #     for (idn, rk) in dic.keys():
     #         if idn == k:
     #             ranks.add(rk)
     #     mpl.plot(sorted(list(ranks)), [dic[(k,r)][12] for r in sorted(list(ranks))], "+-")
-    mpl.subplot(313)
+    plt.subplot(313)
     for k in range(0,i):
         ranks=set()
         for (idn, rk) in dic.keys():
             if idn == k:
                 ranks.add(rk)
-        mpl.plot(sorted(list(ranks)), [dic[(k,r)][8] for r in sorted(list(ranks))], "+-")
-        mpl.legend(["NDCG-5 on $S_{RNN}$"])
-    mpl.show()
+        plt.plot(sorted(list(ranks)), [dic[(k, r)][8] for r in sorted(list(ranks))], "+-")
+        plt.legend(["NDCG-5 on $S_{RNN}$"])
+    plt.show()
     print("")
 
 
@@ -489,37 +582,37 @@ def details2(fs):
     for f in fs:
         parse_one(f, i, dic, cdic, edic)
         i += 1
-    mpl.figure().suptitle("Artificial Problem : Pautomac 37")
-    mpl.subplot(311)
+    plt.figure().suptitle("Artificial Problem : Pautomac 37")
+    plt.subplot(311)
     for k in range(0, i):
         ranks = set()
         for (idn, rk) in dic.keys():
             if idn == k:
                 ranks.add(rk)
-        mpl.plot(sorted(list(ranks)), [dic[(k, r)][1] / dic[(k, r)][2] for r in sorted(list(ranks))], "+-")
-        mpl.legend(["Perplexity ratio"])
-    mpl.subplot(312)
+        plt.plot(sorted(list(ranks)), [dic[(k, r)][1] / dic[(k, r)][2] for r in sorted(list(ranks))], "+-")
+        plt.legend(["Perplexity ratio"])
+    plt.subplot(312)
     # for k in range(0,i):
     #     ranks = set()
     #     for (idn, rk) in dic.keys():
     #         if idn == k:
     #             ranks.add(rk)
     #     mpl.plot(sorted(list(ranks)), [dic[(k,r)][12] for r in sorted(list(ranks))], "+-")
-    mpl.subplot(313)
+    plt.subplot(313)
     for k in range(0, i):
         ranks = set()
         for (idn, rk) in dic.keys():
             if idn == k:
                 ranks.add(rk)
-        mpl.plot(sorted(list(ranks)), [dic[(k, r)][25] for r in sorted(list(ranks))], "+-")
-        mpl.legend(["NDCG-5 on $S_{RNN}$"])
-    mpl.show()
+        plt.plot(sorted(list(ranks)), [dic[(k, r)][25] for r in sorted(list(ranks))], "+-")
+        plt.legend(["NDCG-5 on $S_{RNN}$"])
+    plt.show()
     print("")
 
 
 def details3eps(dic, cdic, edic, nat, p1, p2):
-    mpl.figure()
-    mpl.subplots_adjust(wspace=0.40)
+    plt.figure()
+    plt.subplots_adjust(wspace=0.40)
     #
     dicnat = dict()
     cdicnat = dict()
@@ -527,53 +620,53 @@ def details3eps(dic, cdic, edic, nat, p1, p2):
     parse_one(nat, 0, dicnat, cdicnat, edicnat)
     # mpl.subplot(131).set_title("RNN perp PautNat2")
     h1 = host.host_subplot(131)
-    h1.set_title("PAutomaC Nat. 2 |(P,S)| = (800,800)")
-    mpl.xlabel("WA rank")
+    h1.set_title("PAutomaC Nat. 2\n|(P,S)| = (800,800)")
+    plt.xlabel("WA rank")
     h1.set_ylabel("Perplexity")
     epax1 = h1.twinx()
     epax1.set_ylim(0,100)
     epax1.set_ylabel("Zeros %")
     rrange = range(5, 150)
-    h1.plot([r for r in rrange], [log(dicnat[(0,r)][12]) for r in rrange], "x-")
-    h1.plot([r for r in rrange], [log(dicnat[(0,r)][11]) for r in rrange], "+-")
+    h1.plot([r for r in rrange], [(dicnat[(0,r)][12]) for r in rrange], "x-")
+    h1.plot([r for r in rrange], [(dicnat[(0,r)][11]) for r in rrange], "+-")
     epax1.plot([r for r in rrange], [edicnat[(0,r,12)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity", " RNN-RNN Perplexity", "Zeros (%)"])
-    mpl.draw()
+    plt.legend(["RNN-WA", " RNN-RNN", "Zeros (%)"])
+    plt.draw()
     #
     (idn,br) = best(dic, cdic, (lambda x, y: y[29]-x[29]), p1)
     h2 = host.host_subplot(132)
-    h2.set_title("PAutomaC {0} |(P,S)| = ({1},{2})".format(p1, cdic[idn][1], cdic[idn][2]))
-    mpl.xlabel("WA rank")
+    h2.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p1, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
     h2.set_ylabel("Perplexity")
     epax2 = h2.twinx()
     epax2.set_ylim(0, 100)
     epax2.set_ylabel("Zeros %")
     rrange = range(4,100)
-    h2.plot([r for r in rrange], [log(dic[(idn,r)][29]) for r in rrange], "x-")
-    h2.plot([r for r in rrange], [log(dic[(idn,r)][28]) for r in rrange], "+-")
+    h2.plot([r for r in rrange], [(dic[(idn,r)][29]) for r in rrange], "x-")
+    h2.plot([r for r in rrange], [(dic[(idn,r)][28]) for r in rrange], "+-")
     epax2.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity", " RNN-RNN Perplexity", "Zeros (%)"])
+    plt.legend(["RNN-WA", " RNN-RNN", "Zeros (%)"])
     #
     (idn, br) = best(dic, cdic, (lambda x, y: y[29] - x[29]), p2)
     h3 = host.host_subplot(133)
-    h3.set_title("PAutomaC {0} |(P,S)| = ({1},{2})".format(p2, cdic[idn][1], cdic[idn][2]))
-    mpl.xlabel("WA rank")
+    h3.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p2, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
     h3.set_ylabel("Perplexity")
     epax3 = h3.twinx()
     epax3.set_ylim(0, 100)
     epax3.set_ylabel("Zeros %")
     rrange = range(4, 100)
-    h3.plot([r for r in rrange], [log(dic[(idn, r)][29]) for r in rrange], "x-")
-    h3.plot([r for r in rrange], [log(dic[(idn, r)][28]) for r in rrange], "+-")
+    h3.plot([r for r in rrange], [(dic[(idn, r)][29]) for r in rrange], "x-")
+    h3.plot([r for r in rrange], [(dic[(idn, r)][28]) for r in rrange], "+-")
     epax3.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity", " RNN-RNN Perplexity", "Zeros (%)"])
+    plt.legend(["RNN-WA", " RNN-RNN", "Zeros (%)"])
     #
-    mpl.show()
+    plt.show()
 
 
-def details3(dic, cdic, edic, nat, p1, p2):
-    mpl.figure()
-    mpl.subplots_adjust(wspace=0.40)
+def details3epsKL(dic, cdic, edic, nat, p1, p2):
+    plt.figure()
+    plt.subplots_adjust(wspace=0.40)
     #
     dicnat = dict()
     cdicnat = dict()
@@ -581,79 +674,138 @@ def details3(dic, cdic, edic, nat, p1, p2):
     parse_one(nat, 0, dicnat, cdicnat, edicnat)
     # mpl.subplot(131).set_title("RNN perp PautNat2")
     h1 = host.host_subplot(131)
-    h1.set_title("PAutomaC Nat. 2 |(P,S)| = (800,800)")
-    mpl.xlabel("WA rank")
-    h1.set_ylabel("Perplexity")
-    # epax1 = h1.twinx()
-    # epax1.set_ylim(0,100)
-    # epax1.set_ylabel("Zeros %")
+    h1.set_title("PAutomaC Nat. 2\n|(P,S)| = (800,800)")
+    plt.xlabel("WA rank")
+    h1.set_ylabel("KL-divergence")
+    epax1 = h1.twinx()
+    epax1.set_ylim(0,100)
+    epax1.set_ylabel("Zeros %")
     rrange = range(5, 150)
-    h1.plot([r for r in rrange], [log(dicnat[(0,r)][12]) for r in rrange], "x-")
-    h1.plot([r for r in rrange], [log(dicnat[(0,r)][11]) for r in rrange], "+-")
-    # epax1.plot([r for r in rrange], [edicnat[(0,r,12)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity"," RNN-RNN Perplexity"])
+    h1.plot([r for r in rrange], [(dicnat[(0,r)][0]) for r in rrange], "x-")
+    # h1.plot([r for r in rrange], [log(dicnat[(0,r)][11]) for r in rrange], "+-")
+    h1.plot([],[])
+    epax1.plot([r for r in rrange], [edicnat[(0,r,0)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", "Zeros (%)"])
+    plt.draw()
     #
-    (idn,br) = best(dic, cdic, (lambda x, y: y[29]-x[29]), p1)
+    (idn,br) = best(dic, cdic, (lambda x, y: x[7]-y[7]), p1)
     h2 = host.host_subplot(132)
-    h2.set_title("PAutomaC {0} |(P,S)| = ({1},{2})".format(p1, cdic[idn][1], cdic[idn][2]))
-    mpl.xlabel("WA rank")
-    h2.set_ylabel("Perplexity")
-    # epax2 = h2.twinx()
-    # epax2.set_ylim(0, 100)
-    # epax2.set_ylabel("Zeros %")
+    h2.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p1, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
+    h2.set_ylabel("KL-divergence")
+    epax2 = h2.twinx()
+    epax2.set_ylim(0, 100)
+    epax2.set_ylabel("Zeros %")
     rrange = range(4,100)
-    h2.plot([r for r in rrange], [log(dic[(idn,r)][29]) for r in rrange], "x-")
-    h2.plot([r for r in rrange], [log(dic[(idn,r)][28]) for r in rrange], "+-")
-    # epax2.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity"," RNN-RNN Perplexity"])
+    h2.plot([r for r in rrange], [(dic[(idn,r)][7]) for r in rrange], "x-")
+    # h2.plot([r for r in rrange], [log(dic[(idn,r)][28]) for r in rrange], "+-")
+    h2.plot([],[])
+    epax2.plot([r for r in rrange], [edic[(idn, r, 7)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", "Zeros (%)"])
     #
-    (idn, br) = best(dic, cdic, (lambda x, y: y[29] - x[29]), p2)
+    (idn, br) = best(dic, cdic, (lambda x, y: x[7] - y[7]), p2)
     h3 = host.host_subplot(133)
-    h3.set_title("PAutomaC {0} |(P,S)| = ({1},{2})".format(p2, cdic[idn][1], cdic[idn][2]))
-    mpl.xlabel("WA rank")
-    h3.set_ylabel("Perplexity")
-    # epax3 = h3.twinx()
-    # epax3.set_ylim(0, 100)
-    # epax3.set_ylabel("Zeros %")
+    h3.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p2, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
+    h3.set_ylabel("KL-divergence")
+    epax3 = h3.twinx()
+    epax3.set_ylim(0, 100)
+    epax3.set_ylabel("Zeros %")
     rrange = range(4, 100)
-    h3.plot([r for r in rrange], [log(dic[(idn, r)][29]) for r in rrange], "x-")
-    h3.plot([r for r in rrange], [log(dic[(idn, r)][28]) for r in rrange], "+-")
-    # epax3.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
-    mpl.legend(["RNN-WA Perplexity"," RNN-RNN Perplexity"])
+    h3.plot([r for r in rrange], [(dic[(idn, r)][7]) for r in rrange], "x-")
+    # h3.plot([r for r in rrange], [log(dic[(idn, r)][28]) for r in rrange], "+-")
+    h3.plot([])
+    epax3.plot([r for r in rrange], [edic[(idn, r, 7)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", "Zeros (%)"])
     #
-    mpl.show()
+    plt.show()
 
 
-def details3_old(dic, cdic, nat, p1, p2):
-    mpl.figure().suptitle("Title")
+def details3(dic, cdic, edic, nat, p1, p2):
+    plt.figure()
+    plt.subplots_adjust(wspace=0.40)
     #
     dicnat = dict()
     cdicnat = dict()
     edicnat = dict()
     parse_one(nat, 0, dicnat, cdicnat, edicnat)
-    mpl.subplot(131).set_title("RNN perp PautNat2")
-    rrange = range(1, 150)
-    mpl.plot([r for r in rrange], [dicnat[(0,r)][12] for r in rrange], "x-")
-    mpl.plot([r for r in rrange], [dicnat[(0,r)][11] for r in rrange], "+-")
+    # mpl.subplot(131).set_title("RNN perp PautNat2")
+    h1 = host.host_subplot(131)
+    plt.gca().yaxis.ticklabel_format(style="sci")
+    h1.set_title("PAutomaC Nat. 2\n|(P,S)| = (800,800)")
+    plt.xlabel("WA rank")
+    h1.set_ylabel("Perplexity")
+    # epax1 = h1.twinx()
+    # epax1.set_ylim(0,100)
+    # epax1.set_ylabel("Zeros %")
+    rrange = range(5, 150)
+    h1.plot([r for r in rrange], [(dicnat[(0,r)][12]) for r in rrange], "x-")
+    h1.plot([r for r in rrange], [(dicnat[(0,r)][11]) for r in rrange], "+-")
+    # epax1.plot([r for r in rrange], [edicnat[(0,r,12)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", " RNN-RNN"])
     #
     (idn,br) = best(dic, cdic, (lambda x, y: y[29]-x[29]), p1)
-    mpl.subplot(132).set_title("RNN Perp pb {2}, ({0},{1}) block".format(cdic[idn][2], cdic[idn][3], p1))
+    h2 = host.host_subplot(132)
+    h2.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p1, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
+    h2.set_ylabel("Perplexity")
+    # epax2 = h2.twinx()
+    # epax2.set_ylim(0, 100)
+    # epax2.set_ylabel("Zeros %")
+    rrange = range(4,100)
+    h2.plot([r for r in rrange], [(dic[(idn,r)][29]) for r in rrange], "x-")
+    h2.plot([r for r in rrange], [(dic[(idn,r)][28]) for r in rrange], "+-")
+    # epax2.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", " RNN-RNN"])
+    #
+    (idn, br) = best(dic, cdic, (lambda x, y: y[29] - x[29]), p2)
+    h3 = host.host_subplot(133)
+    h3.set_title("PAutomaC {0}\n|(P,S)| = ({1},{2})".format(p2, cdic[idn][1], cdic[idn][2]))
+    plt.xlabel("WA rank")
+    h3.set_ylabel("Perplexity")
+    # epax3 = h3.twinx()
+    # epax3.set_ylim(0, 100)
+    # epax3.set_ylabel("Zeros %")
+    rrange = range(4, 100)
+    h3.plot([r for r in rrange], [(dic[(idn, r)][29]) for r in rrange], "x-")
+    h3.plot([r for r in rrange], [(dic[(idn, r)][28]) for r in rrange], "+-")
+    # epax3.plot([r for r in rrange], [edic[(idn, r, 29)] for r in rrange], ".--")
+    plt.legend(["RNN-WA", " RNN-RNN"])
+    #
+    plt.show()
+
+
+def details3_old(dic, cdic, nat, p1, p2):
+    plt.figure().suptitle("Title")
+    #
+    dicnat = dict()
+    cdicnat = dict()
+    edicnat = dict()
+    parse_one(nat, 0, dicnat, cdicnat, edicnat)
+    plt.subplot(131).set_title("RNN perp PautNat2")
+    rrange = range(1, 150)
+    plt.plot([r for r in rrange], [dicnat[(0, r)][12] for r in rrange], "x-")
+    plt.plot([r for r in rrange], [dicnat[(0, r)][11] for r in rrange], "+-")
+    #
+    (idn,br) = best(dic, cdic, (lambda x, y: y[29]-x[29]), p1)
+    plt.subplot(132).set_title("RNN Perp pb {2}, ({0},{1}) block".format(cdic[idn][2], cdic[idn][3], p1))
     rrange = range(1,100)
-    mpl.plot([r for r in rrange], [dic[(idn,r)][29] for r in rrange], "x-")
-    mpl.plot([r for r in rrange], [dic[(idn,r)][28] for r in rrange], "+-")
+    plt.plot([r for r in rrange], [dic[(idn, r)][29] for r in rrange], "x-")
+    plt.plot([r for r in rrange], [dic[(idn, r)][28] for r in rrange], "+-")
     #
     (idn,br) = best(dic, cdic, (lambda x, y: y[29]-x[29]), p2)
-    mpl.subplot(133).set_title("RNN Perp pb {2}, ({0},{1}) block".format(cdic[idn][2], cdic[idn][3], p2))
+    plt.subplot(133).set_title("RNN Perp pb {2}, ({0},{1}) block".format(cdic[idn][2], cdic[idn][3], p2))
     rrange = range(1,100)
-    mpl.plot([r for r in rrange], [dic[(idn,r)][29] for r in rrange], "x-")
-    mpl.plot([r for r in rrange], [dic[(idn,r)][28] for r in rrange], "+-")
+    plt.plot([r for r in rrange], [dic[(idn, r)][29] for r in rrange], "x-")
+    plt.plot([r for r in rrange], [dic[(idn, r)][28] for r in rrange], "+-")
     #
-    mpl.show()
+    plt.show()
 
 
 def spice4wave(files):
     labels = ["(300,300)", "(400,400)", "(800,800)"]
     ma = ["+-","x-","<-"]
+    rrange = range(1,101)
     dic = dict()
     cdic = dict()
     edic = dict()
@@ -661,18 +813,19 @@ def spice4wave(files):
     for f in files :
         parse_one(f, i, dic, cdic, edic)
         i+=1
-    mpl.figure()
+    plt.figure()
+    # mpl.rcParams.update({'font.size': 22})
     for k in range(i):
         ranks=[]
         for (id,r) in dic.keys():
             if id == k:
                 ranks.append(r)
         ranks = sorted(ranks)
-        mpl.plot(ranks, [dic[(k,r)][8] for r in ranks], ma[k])
-    mpl.legend(labels)
-    mpl.xlabel("WA rank")
-    mpl.ylabel("NDCG-5")
-    mpl.show()
+        plt.plot([r for r in ranks if r in rrange], [dic[(k, r)][8] for r in ranks if r in rrange], ma[k])
+    plt.legend(labels)
+    plt.xlabel("WA rank")
+    plt.ylabel("NDCG$_5$")
+    plt.show()
 
 
 def ptitresume(dic, cdic, edic, carac, rk):
@@ -715,24 +868,22 @@ if __name__ == "__main__":
     # plot_overall_perp(d, d2)
     problems = list(set([x[0] for x in d2.values()]))
     #
+    mpl.rcParams.update({'font.size': 22})
+    #
+    #
     # latex_best_rnn(d1, d2, d3, problems)
     #
     # latex_best_test(d1, d2, d3, problems)
-    fabulous_four_hist(d1, d2, problems)
+    # fabulous_four_hist(d1, d2, problems)
     # for i in [1,2,3,4]:
     #     fabulous_four_hist(d1, d2, problems, opt=i)
-    # for pb in problems:
-        # b = best(d,d2, (lambda x, y: y[2]-x[2]), pb)  # Lamba : min perp_test_extr
-    # plot_some_appart(d1, d2, 24, [[2],[7], [21], [25]], rank_range)
 
-    # #
-    # # details(["spice4/metrics800"])
-    # # details2(["extr2/OAR.1711181.stdout"])
 
 
     # details3(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
     # details3eps(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
+    details3epsKL(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
 
+    # fabulous_four_hist_WER(d1, d2, problems)
     # spice4wave(sys.argv[3:])
 
-    ptitresume(d1,d2,d3, (24, 800, 800, "0_6", "0_6"), 5)
