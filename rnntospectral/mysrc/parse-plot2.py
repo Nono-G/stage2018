@@ -731,7 +731,7 @@ def details3(dic, cdic, edic, nat, p1, p2):
     parse_one(nat, 0, dicnat, cdicnat, edicnat)
     # mpl.subplot(131).set_title("RNN perp PautNat2")
     h1 = host.host_subplot(131)
-    plt.gca().yaxis.ticklabel_format(style="sci")
+    plt.gca().ticklabel_format(style='sci', axis='y', scilimits=(0,0))
     h1.set_title("PAutomaC Nat. 2\n|(P,S)| = (800,800)")
     plt.xlabel("WA rank")
     h1.set_ylabel("Perplexity")
@@ -883,6 +883,8 @@ if __name__ == "__main__":
     # details3(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
     # details3eps(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
     details3epsKL(d1,d2,d3, "../pautnat2/metrics800", 37, 3)
+
+    print(d1["f282", 6])
 
     # fabulous_four_hist_WER(d1, d2, problems)
     # spice4wave(sys.argv[3:])

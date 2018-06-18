@@ -738,7 +738,7 @@ dans le calculs de certaines mesures, a explorer. Plantage de toutes les variant
 Les erreurs viennent de ready:347 pour 2 et 9, et ready:332 pour 5
 Pour pb 2 et 9, le rnn renvoie un machin négatif dans certains (très) rare cas ? on va lui mettre un
 fix-probas ça le résoudra, du coup a envisager une mesure de l'epsilon.
-Pour pb 5, on tente une inversion d'une matrice pas inversible (Id monis somme des transitions) et
+Pour pb 5, on tente une inversion d'une matrice pas inversible (Id moins somme des transitions) et
 c'est la merde ; conformément aux recommendations de SA, je rajoute dans ce cas là Id*(1e-9) pour
 pouvoir faire l'inversion. C'est inversible mais les calculs partent dans le mur totalement, des
 perplexité a 10^10, des NaN partout.
@@ -968,7 +968,7 @@ Vendredi 11 Mai : 9h30 - 12h30
 Réunion RE Saint charles. Beaucoup de choses.
 1713783 ==> 1713791 Spice
 
-Lundi 14 Mai : 9h -
+Lundi 14 Mai : 9h - 19h
 Première extr finie, petit bug à la fin mais ça empêche pas de récupérer les automates, ok.
 83 fini ok.
 84 en cours, devrait finir
@@ -992,24 +992,66 @@ celui du cluster, et quand il l'a doublé, j'ai coupé le cluster. Ya vraiment u
 OK pour metriques séparément du reste. Ok pour RNNPerp.
 Je teste la troncation brutale pour les mots de la base générés par RNN.
 Ok pour des tables en LATEX (table, tabular) ça a l'air pas trop compliqué, on va pouvoir faire des
-tableaux dans tous les coins !
+tableaux dans tous les coins ! Premier parse-plot qui produit des tableaux latex. OK c'est cool.
+Ultime expé sur pautnat2 avec taille 400x400, c'est pas trop long avec troncation à 20, mais on
+frole déjà la limite de RAM.
+Le soir à la maison : Je tente avec taille 800x800, on creve la RAM avant même la partie Keras,
+cette fois on va a voir be soin du cluster, je lance pour la nuit, sur see4c1 avec 4 threads (ya pas
+foule cette nuit sur le cluster). Plus de RAM mais surement plus long, on verra bien demain. Jobs :
+1714583
+1714584
 
-Mardi 15 Mai :
-Mercredi 16 Mai :
+Mardi 15 Mai : 8h - 19h30
+Ok les extractions de cette nuit semblent s'être bien passé, par contre le calcul des métriques est
+assez long... on verra si ça donne de bons résultats, on pourra relancer si besoin.
+En attendant je vais améliorer le tableau de résultats LATEX et faire le 4 courbes demandé par RE.
+Les métriques de cette nuit sont plutôt passables. ça va probablement en rester là par manque de
+temps.
+Ah oui sauf que pour les 4 courbes, il en manque une justement, qu'on ne faisait pas à l'époque !
+Du coup je lance le recalcul des métriques pour toutes les extr. Pautomac, j'espère que ça ne sera
+pas trop long... Ok les premiers ont fini, ça prends environ 45 min, ça devrait être bon.
+Bon pour les 4 courbes la sortie est assez propre, il manque juste un peu de données pour l'instant.
+J'ai aussi fait les 4 autres courbes réciproques avec les meilleurs paramêtres les uns des autres.
+Maintenant je vais essayer de faire celles autour des détails de SPICE, au moins préparer l'algo et
+tirer spice 10 et pautnat2.
+Bon du coup les résultats a notre disposition sont : 
+Spice 4 : 200, 300, 400, 800
+Spice 7: 200, 800
+Spice 10: 800
+PautNat2 : 800
+Espérons qu'il y en ait quelques uns vaguement pas trop mauvais. Je fais les calculs de métriques
+desuss, en priorité ceux avec taille 800.
 
-Jeudi 17 Mai :
+
+Mercredi 16 Mai : 8h - 19h30
+Ok les re-metriques de pautomac sont faites, je retrace les courbes. C'est bon elles sont faites,
+toutes belles, toutes chaudes. Je vais continuer a calculer des métriques sur les problèmes naturels
+Allez le cluster est plutôt libre, je lance une extraction de la dernière chance avec 1200x1200 sur
+sp4, avec 8 threads de see4c1. JOB -> 1715515. Il prédit environ 6h de keras, on devrait l'avoir en 
+fin de journée, et les métriques demain. Finalement il est mort par manque de RAM.
+La journée plein des graphiques partout, selon demandes de SA et RE.
+
+Jeudi 17 Mai : 9h-12h30
+Graphiques, derniers ajustements.
 Je pars en début d'aprem.
 
 Vendredi 18 Mai : GT (sncf)
 
 Lundi 21 Mai : PENTECOTE
 Mardi 22 Mai : GT
-Mercredi 23 Mai :
-Jeudi 24 Mai :
-Vendredi 25 Mai :
 
-Lundi 28 Mai :
-Mardi 29 Mai :
+Mercredi 23 Mai : 12h30 - 17h30
+Allez c'est le début de la phase rapport. Je vais commencé par relire le journal pour avoir une idée
+de la répartition chronologique, lire le papier final NIPS, un peu de biblio autour, etc,
+
+Jeudi 24 Mai : 11h - 17h30
+Rapport.
+
+Vendredi 25 Mai : 10h - 16h
+SIC + ... + Rapport aprem.
+
+Lundi 28 Mai : JSQ
+Mardi 29 Mai : JSQ
 Mercredi 30 Mai :
 Jeudi 31 Mai :
 Vendredi 1 Juin : RESUME RAPRORT
