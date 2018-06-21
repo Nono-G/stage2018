@@ -1,5 +1,6 @@
 import time
 import torch
+import numpy as np
 from torch import nn as nn
 from torch.nn import functional as tfunc
 
@@ -24,18 +25,22 @@ class LangMod(nn.Module):
         output, h_n = self.rnn(embed, h_0)
         return self.decision(output), h_n
 
-    def tensor_generator(self, words_list, batch_vol, hushed):
-        padlen = max([len(w) for w in words_list]) + 1
+    def tensor_generator(self, words_list, batch_vol, hush=None, device="cpu"):
+        hushed = (hush is not None)
+        if hushed:
+            padlen = hush.len_code(max(words_list)) + 1
+        else:
+            padlen = max([len(w) for w in words_list]) + 1
         current_v = 0
         batch = []
         for word in words_list:
-            t = torch.zeros(1, padlen).long()
+            t = torch.zeros((1, padlen), dtype=torch.int64, device=device)
             if hushed:
-                w = self.hush.decode(word)
+                w = hush.decode(word)
             else:
                 w = word
             w = [self.nalpha + 1] + [elt + 1 for elt in w]
-            t[0, :len(w)] = torch.tensor(w)
+            t[0, :len(w)] = torch.tensor(w, dtype=torch.int64, device=device)
             batch.append(t)
             current_v += 1
             if current_v == batch_vol:
@@ -46,29 +51,60 @@ class LangMod(nn.Module):
         if len(batch) > 0:
             yield torch.cat(batch, 0)
 
-    def eval_forward_batch(self, ws, batch=1, hushed=False):
+    def probas_tables_numpy(self, ws, batch=1, hush=None, del_start_symb=False, quiet=False, device="cpu"):
+        """evaluate batch, compute softmax, then copy to cpu to free VRAM, return as numpy to emphasize that"""
         ti = time.time()
         nb_batch = int(len(ws)/batch)+1
         i = 0
         out = []
         with torch.no_grad():
             self.eval()
-            gen = self.tensor_generator(ws, batch, hushed)
+            gen = self.tensor_generator(ws, batch, hush, device=device)
             for tens in gen:
-                print("\rBatch : {0} / {1} : ".format(i,nb_batch), end="")
-                out.append(self.forward(tens)[0])
-                print("Done in {0}".format(666), end="")
+                if not quiet:
+                    print("\rBatch : {0} / {1} : ".format(i,nb_batch), end="")
+                preds, _ = self.forward(tens)
+                if del_start_symb:
+                    preds = tfunc.softmax(preds[:, :, :-1], dim=2)
+                else:
+                    preds = tfunc.softmax(preds, dim=2)
+                out.append(preds.cpu().numpy())
                 i += 1
         tf = time.time()
-        print("\rComplete with total time : {0:.2f} seconds.".format(tf-ti))
+        if not quiet:
+            print("\rCompleted {0} batches in : {1:.2f} seconds.".format(i, tf-ti))
+        # return torch.cat(out, 0)
+        return np.concatenate(out, 0)
+
+    def eval_forward_batch(self, ws, batch=1, hush=None, quiet=False, device="cpu"):
+        ti = time.time()
+        nb_batch = int(len(ws)/batch)+1
+        i = 0
+        out = []
+        with torch.no_grad():
+            self.eval()
+            gen = self.tensor_generator(ws, batch, hush, device=device)
+            for tens in gen:
+                if not quiet:
+                    print("\rBatch : {0} / {1} : ".format(i,nb_batch), end="")
+                out.append(self.forward(tens)[0])
+                # if not quiet:
+                #     print("Done in {0}".format(666), end="")
+                i += 1
+        tf = time.time()
+        if not quiet:
+            print("\rCompleted {0} batches in : {1:.2f} seconds.".format(i, tf-ti))
         return torch.cat(out, 0)
 
-    def probas_tables(self, ws, batch=1, hushed=False):
-        t = self.eval_forward_batch(ws, batch, hushed)
-        return tfunc.softmax(t[:, :, :-1], dim=2)
+    def probas_tables(self, ws, batch=1, hush=None, del_start_symb=False, quiet=False, device="cpu"):
+        t = self.eval_forward_batch(ws, batch, hush, quiet=quiet, device=device)
+        if del_start_symb:
+            return tfunc.softmax(t[:, :, :-1], dim=2)
+        else:
+            return tfunc.softmax(t, dim=2)
 
-    def probas_words(self, ws, batch=1, hushed=False):
-        ptab = self.probas_tables(ws, batch, hushed)
+    def probas_words(self, ws, batch=1, hushed=False, device="cpu"):
+        ptab = self.probas_tables(ws, batch, hushed, device=device)
         probas = []
         for i, _w in enumerate(ws):
             if hushed:

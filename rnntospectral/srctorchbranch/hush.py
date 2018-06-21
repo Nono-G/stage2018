@@ -80,6 +80,7 @@ class Hush:
             return 0
 
     def prefixes_codes(self, code):
+        """Return a set of prefixes codes, c itself is excluded"""
         r = set()
         c = code
         i = 0
@@ -103,6 +104,7 @@ class Hush:
         return code - diff
 
     def suffixes_codes(self, c):
+        """Return a list of suffixes codes, from shorter to longer, c itself is included"""
         ret = [c]
         code = c
         le = self.len_code(code)

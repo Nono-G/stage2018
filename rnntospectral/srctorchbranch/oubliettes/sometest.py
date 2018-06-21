@@ -1,4 +1,7 @@
 import random
+import splearn
+
+a = splearn.Automaton
 
 random.seed(666)
 
