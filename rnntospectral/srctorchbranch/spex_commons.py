@@ -30,10 +30,10 @@ class Spex:
         # Semi-constants :
         self.quiet = False
         self.epsilon = 1e-30
-        self.batch_vol = 2048
+        self.batch_vol = 1024
         self.randwords_minlen = 0
         self.randwords_maxlen = 100
-        self.randwords_nb = 2000
+        self.randwords_nb = 20
         # Debug Warning !
         if self.randwords_nb < 1000:
             print("DEBUG - DEBUG - DEBUG - DEBUG - DEBUG")
@@ -128,9 +128,11 @@ class Spex:
 
     @classmethod
     def meter(cls, rnnstring, teststring="", modelstring=""):
+        """Make a pseudo-extractor, only to compute metrics"""
         return cls(rnnstring, -1, -1, teststring, modelstring)
 
     def ready(self):
+        """Get ready to perform extractions : generate a basis, evaluate the words, fill Hankel matrices"""
         if self.metrics_calc_level > 0:
             self.rank_independent_metrics()
         # *********
@@ -223,8 +225,9 @@ class Spex:
             # noinspection PyProtectedMember
             spectral_estimator._automaton = spectral_estimator._hankel.to_automaton(rank, self.quiet)
             # OK on a du a peu près rattraper l'état après fit.
-        except ValueError:
+        except ValueError as err:
             pr(0, False, "Error, rank {0} too big compared to the length of words".format(rank))
+            # print(err)
             return None
         pr(0, self.quiet, "... Done !")
         self.last_extr_aut = spectral_estimator.automaton
@@ -237,7 +240,7 @@ class Spex:
         return spectral_estimator
 
     def rank_dependent_metrics(self):
-        """Metrics which are dependant to the rank"""
+        """Metrics involving the extracted automaton depend on the rank"""
         rank = self.last_extr_aut.nbS
         self.ranks.append(rank)
         print("Metrics for rank {0} :".format(rank))
@@ -323,7 +326,7 @@ class Spex:
         self.print_metrics_chart(ranks=self.ranks[i:])
 
     def print_metrics_chart(self, ranks=None):
-        """"Print (pretty) metrics chart, with as much columns as ranks, for the parser convenience """
+        """"Print (pretty) metrics chart, with as much columns as ranks, for the parser's convenience"""
         if self.metrics_calc_level > 1:
             measures = ["perp-test-target", "perp-test-rnn", "perp-test-extr",
                         "perp-rand-target", "perp-rand-rnn", "perp-rand-extr",
@@ -494,6 +497,9 @@ class Spex:
         return []
 
     def proba_words_normal(self, words, asdict=True, wer=False, prefixes_dict=None):
+        """Computes the probability of each word in words according to the RNN
+        This version does not use any optimization and can be used only for samll sets of words (test sets)
+        WER can be computed during the process"""
         if prefixes_dict is None:
             prefixes_dict = proba_all_prefixes_rnn(self.rnn_model, words, quiet=self.quiet,
                                                    bsize=self.batch_vol, device=self.device)
@@ -533,12 +539,15 @@ class Spex:
                 return preds
 
     def proba_words_special(self, words, asdict=True):
+        """Unimplemented placeholder for optimized version of proba_words. Does not have to be able to compute WER"""
         return self.proba_words_normal(words, asdict)
 
     def gen_words(self):
+        """Unimplemented placeholder, the choice of the basis generation method will be made here"""
         return [], [], []
 
     def randwords(self, nb, minlen, maxlen):
+        """Produces uniformly random words"""
         words = set()
         while len(words) < nb:
             le = random.randint(minlen, maxlen)
@@ -549,13 +558,15 @@ class Spex:
         words = [list(w) for w in words]
         return words
 
-    def aut_rand_words(self, nbw, temp):
+    def aut_rand_words(self, nbw, temperature):
+        """Produces random words following the distribution defined by the model automaton
+        This distribution can be tweaked using the temperature parameter to obtain more or less likely words"""
         aut = self.true_automaton
         words_set = set()
         random.seed()
         while len(words_set) < nbw:
             word = []
-            state = temp_dist_rand(aut.initial, temp)
+            state = temp_dist_rand(aut.initial, temperature)
             while state != -1:
                 next_trans = dict()
                 proba = list()
@@ -567,7 +578,7 @@ class Spex:
                         next_trans[i] = (l, s)
                         proba.append(aut.transitions[l][state][s])
                         i += 1
-                n = temp_dist_rand(proba, temp)
+                n = temp_dist_rand(proba, temperature)
                 word += [next_trans[n][0]]
                 state = next_trans[n][1]
             words_set.add(tuple(word[:-1]))
@@ -677,7 +688,7 @@ def pr(indent=0, quiet=False, m="", end="\n"):
         sys.stdout.flush()
 
 
-def proba_all_prefixes_rnn(model, words, bsize=2048, quiet=False, del_start_symb=False, device="cpu"):
+def proba_all_prefixes_rnn(model, words, bsize=512, quiet=False, del_start_symb=False, device="cpu"):
     """Returns a dict containing next symbol probas after every prefix of every word given, using an rnn model"""
     predictions = model.probas_tables_numpy(words, bsize, del_start_symb=del_start_symb, quiet=quiet, device=device)
     preds_dict = dict()
@@ -737,6 +748,8 @@ def proba_next_aut(aut, prefix):
 
 
 def neg_zero(seq1, seq2):
+    """Counts how many times a negative value appears in seq1 and seq2 contains a non-zero value at same index
+    Output the epsilon use rate (negatives which are not covered by a zero, divided by total length)"""
     neg = 0
     neg_cover = 0
     epsilon_used = 0

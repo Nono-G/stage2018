@@ -6,8 +6,10 @@ import torch
 from spex_commons import pr
 from hank3 import SpexRandDrop, words_task
 
+"""Executable file, extraction with rnn-generated basis"""
 
 class SpexRandRNNW(SpexRandDrop):
+    """Override basis generation to use rnn-generated basis"""
     def __init__(self, digest, weights, pref_drop, suff_drop, m_test_set="", met_model="", context="", device="cpu"):
         SpexRandDrop.__init__(self, (digest+" "+weights), 1, 1, pref_drop, suff_drop, m_test_set, met_model, context, device)
         self.temp_coeff = 1
@@ -59,7 +61,7 @@ class SpexRandRNNW(SpexRandDrop):
         del hushed_prefixes
         del hushed_suffixes
         # ###
-        pr(self.quiet, "\tAssembling words from suffixes and prefixes...")
+        pr(1, self.quiet, "Assembling words from suffixes and prefixes...")
         letters = [[]] + [[i] for i in range(self.nalpha)]
         encoded_words_set = set()
         if self.nb_proc > 1:
@@ -82,7 +84,16 @@ class SpexRandRNNW(SpexRandDrop):
 
 def main():
     if len(sys.argv) < 7 or len(sys.argv) > 9:
-        print("Usage :: {0} device digestfile weightsfile ranks nb_prefs nb_suffs [test_file [model_file]]"
+        print(("Usage :: {0} DEVICE DIGESTFILE WEIGHTSFILE RANKS NB_PREFS NB_SUFFS [TEST_FILE [MODEL_FILE]]\n" +
+               "DEVICE : 'cuda' or 'cpu' or a specific cuda device such as 'cuda:2'\n" +
+               "DIGESTFILE : path to a digest file, produced by the model trainer\n" +
+               "WEIGHTSFILE : path to a weights file, produced by the model trainer\n" +
+               "RANKS : list of ranks to perform extractions, separated by '_' (e.g. '5_10_15_20')\n" +
+               "NB_PREFS : number of unique prefixes in the sub-block basis\n" +
+               "NB_SUFFS : number of unique suffixes in the sub-block basis\n" +
+               "TEST_FILE : path to a file containing test strings (OPTIONAL)\n" +
+               "MODEL_FILE : path to a file containing an automaton description (OPTIONAL)\n"
+               )
               .format(sys.argv[0]))
         sys.exit(-666)
     # XXXXXX :
@@ -91,7 +102,7 @@ def main():
                .replace(" ", "_")
                .replace("/", "+"))
     print("Context :", context)
-    print("Ranks :", sys.argv[3])
+    print("Ranks :", sys.argv[4])
     device = sys.argv[1]
     model_digest = sys.argv[2]
     model_weights = sys.argv[3]

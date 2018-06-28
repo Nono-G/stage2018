@@ -37,11 +37,9 @@ class SpexRandDrop(SpexHush):
         miss = 0
         if targ_coeff > 1.0:
             target = targ_coeff
-            # noinspection PyPep8
             tarfun = lambda x, y: x
         else:
             target = len(words)*targ_coeff
-            # noinspection PyPep8
             tarfun = lambda x, y: y
         while (tarfun(len(prefs_set), len(index_set)) < target) and miss < self.patience:
             key = random.randrange(0, len(words))
@@ -117,17 +115,18 @@ class SpexRandDrop(SpexHush):
         return lig, col, list(encoded_words_set)
 
     def proba_words_special(self, words, asdict=True):
-        predictions = self.rnn_model.probas_tables_numpy(words, self.batch_vol, hush=self.hush,
-                                                         del_start_symb=True, device=self.device)
-        start_factor = (len(words)) / (sum([self.hush.len_code(w) for w in words]))
-        # start_factor = 1
-        preds = np.empty(len(words))
-        for i, wcode in enumerate(words):
-            word = [x+1 for x in self.hush.decode(wcode)] + [0]
-            acc = start_factor
-            for k in range(len(word)):
-                acc *= predictions[i,k,word[k]]
-            preds[i] = acc
+        # predictions = self.rnn_model.probas_tables_numpy(words, self.batch_vol, hush=self.hush,
+        #                                                  del_start_symb=True, device=self.device)
+        # start_factor = (len(words)) / (sum([self.hush.len_code(w) for w in words]))
+        # # start_factor = 1
+        # preds = np.empty(len(words))
+        # for i, wcode in enumerate(words):
+        #     word = [x+1 for x in self.hush.decode(wcode)] + [0]
+        #     acc = start_factor
+        #     for k in range(len(word)):
+        #         acc *= predictions[i,k,word[k]]
+        #     preds[i] = acc
+        preds = self.rnn_model.full_probas(words, self.batch_vol, self.hush, del_start_symb=True, device=self.device)
         if asdict:  # On retourne un dictionnaire
             probas = dict()
             for i in range(len(words)):
@@ -173,6 +172,7 @@ def words_task(args):
             enc_set.add(h.encode(h.decode((prefix, letter, suffix))))
     return enc_set
 
+
 def main():
     if len(sys.argv) < 9 or len(sys.argv) > 11:
         print("Usage :: {0} device digestfile weightsfile ranks lrows lcols coeffrows coeffcols [testfile [modelfile]]"
@@ -203,7 +203,7 @@ def main():
         aut_model = ""
     spex = SpexRandDrop((digest+" "+weights), lrows, lcols, coeffcols, coeffrows, testfile, aut_model, context, device)
     for rank in ranks:
-        est = spex.extr(rank)
+        _ = spex.extr(rank)
         # est.Automaton.write(est.automaton, filename=("aut-"+context))
     spex.print_metrics_chart()
     spex.print_metrics_chart_n_max(8)

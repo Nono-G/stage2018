@@ -11,8 +11,8 @@ import models
 
 # TODO Unseed when in production
 # Give seeds to RNG for reproducibility
-torch.manual_seed(666)
-random.seed(666)
+# torch.manual_seed(666)
+# random.seed(666)
 
 """
 Runnable program to train models, and related classes and functions
@@ -20,10 +20,12 @@ Runnable program to train models, and related classes and functions
 
 
 def save_weights(model, basename, epochid):
+    """Saves the weights of the model. the name of the file is computed with basename and epochid"""
     torch.save(model.state_dict(), basename + ("-e{0}".format(epochid)))
 
 
 def save_digest(model, basename):
+    """Saves the informations which are not weights, but still needed to load a model"""
     with open(basename+"-d", "w") as file:
         file.write(model.modelname)
         file.write("\n")
@@ -34,6 +36,7 @@ def save_digest(model, basename):
 
 
 def load(digfile, dictfile):
+    """Loads a model from two files ; digest and weights"""
     with open(digfile, "r") as dig:
         modelname = dig.readline()
         (nalpha, hidn_size) = tuple([int(s) for s in dig.readline().split()])
@@ -43,8 +46,9 @@ def load(digfile, dictfile):
 
 
 def perf(model, loader):
+    """Evaluates the performance of the RNN on the data from the given loader"""
     criterion = nn.CrossEntropyLoss()
-    model.eval()
+    model.eval()  # Disable dropout, that sort of things...
     total_loss = 0
     num = 0
     with torch.no_grad():
@@ -57,6 +61,7 @@ def perf(model, loader):
 
 
 def fit(model, epochs, train_loader, valid_loader=None, save_each_epoch=False):
+    """Trains a model"""
     ti = time.time()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters())
@@ -93,6 +98,7 @@ def fit(model, epochs, train_loader, valid_loader=None, save_each_epoch=False):
 
 
 def parse(filestring):
+    """Parse pautomac files"""
     with open(filestring, 'r') as fp:
         ws = []
         line = fp.readline()
@@ -104,6 +110,7 @@ def parse(filestring):
 
 # noinspection PyCallingNonCallable,PyUnresolvedReferences
 def enc_tensorize(ws, nalpha, nb_sample=-1, shuffle=False, device="cpu"):
+    """Encodes (add start symbol, shift by one, add end symbol) and loads into a Tensor raw sequences"""
     len_cover = 0.9
     le = sorted([len(w) for w in ws])[int(len(ws)*len_cover)]
     x = torch.zeros((len(ws), le), device=device).long()
@@ -128,6 +135,7 @@ def enc_tensorize(ws, nalpha, nb_sample=-1, shuffle=False, device="cpu"):
 
 
 def trainf(modelname, train_file, sample, neurons, epochs, batch, test_file=None, device="cpu"):
+    """From the given parameter, outputs a trained model"""
     wst, nalpha = parse(train_file)
     do_test = test_file is not None
     if do_test:
