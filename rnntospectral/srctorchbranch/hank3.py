@@ -8,6 +8,8 @@ import multiprocessing
 from spex_commons import pr, SpexHush
 from hush import Hush
 
+"""Executable file, extraction with random basis"""
+
 
 class SpexRandDrop(SpexHush):
     def __init__(self, modelfilestring, lrows, lcols, pref_drop, suff_drop, m_test_set="", m_model="", context="", device="cpu"):
@@ -175,10 +177,32 @@ def words_task(args):
 
 def main():
     if len(sys.argv) < 9 or len(sys.argv) > 11:
-        print("Usage :: {0} device digestfile weightsfile ranks lrows lcols coeffrows coeffcols [testfile [modelfile]]"
-              .format(sys.argv[0]))
+        if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "-H" or sys.argv[1] == "h"):
+            print(("USAGE :: {0} DEVICE DIGESTFILE WEIGHTSFILE RANKS" +
+                   " LROWS LCOLS COEFFROWS COEFFCOLS [TEST_FILE [MODEL_FILE]]\n\n" +
+                   "\tDEVICE :\t 'cuda' or 'cpu' or a specific cuda device such as 'cuda:2'\n" +
+                   "\tDIGESTFILE :\t path to a digest file, produced by the model trainer\n" +
+                   "\tWEIGHTSFILE :\t path to a weights file, produced by the model trainer\n" +
+                   "\tRANKS :    \t list of ranks to perform extractions, separated by '_' (e.g. '5_10_15_20')\n" +
+                   "\tLROWS :   \t domain among which the basis prefixes will be picked " +
+                   "(e.g. '4_8_12' for words of length 4, 8 or 12 // '10' for words of length 10 and less)\n" +
+                   "\tLCOLS :   \t domain among which the basis suffixes will be picked " +
+                   "(e.g. '4_8_12' for words of length 4, 8 or 12 // '10' for words of length 10 and less)\n" +
+                   "\tCOEFFROWS :\t if greater than 1, the number of prefixes picked,"+
+                   " else the proportion of all prefixes picked\n" +
+                   "\tCOEFFCOLS :\t if greater than 1, the number of suffixes picked,"+
+                   " else the proportion of all suffixes picked\n" +
+                   "\tTEST_FILE :\t path to a file containing test strings (OPTIONAL)\n" +
+                   "\tMODEL_FILE :\t path to a file containing an automaton description (OPTIONAL)\n"
+                   )
+                  .format(sys.argv[0]))
+        else:
+            print(("USAGE :: {0} DEVICE DIGESTFILE WEIGHTSFILE" +
+                   "RANKS LROWS LCOLS COEFFROWS COEFFCOLS [TEST_FILE [MODEL_FILE]]\n" +
+                   "OR '{0} -h' for full help."
+                   )
+                  .format(sys.argv[0]))
         sys.exit(-666)
-    # XXXXXX :
     context = ("H3-{0}l{1}x{2}c{3}x{4}"
                  .format(sys.argv[3], sys.argv[5], sys.argv[7], sys.argv[6], sys.argv[8])
                  .replace(" ", "_")

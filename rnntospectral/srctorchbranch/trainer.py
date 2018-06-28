@@ -158,7 +158,25 @@ def trainf(modelname, train_file, sample, neurons, epochs, batch, test_file=None
 
 def main():
     if len(sys.argv) < 6 or len(sys.argv) > 9:
-        sys.exit("ARGS : device train_file neurons epochs batch [model_name [sampleNB [test_file]]]")
+        if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "-H" or sys.argv[1] == "h"):
+            print(("USAGE : {0} DEVICE TRAIN_FILE NEURONS EPOCHS BATCH [MODEL_NAME [SAMPLE_NB [TEST_FILE]]]\n\n" +
+                   "\tDEVICE :\t 'cuda' or 'cpu' or a specific cuda device such as 'cuda:2'\n" +
+                   "\tTRAIN_FILE :\t path to a file containing the training set (PAutomaC format)\n" +
+                   "\tNEURONS :\t number of neurons in the recurrent layers\n" +
+                   "\tEPOCHS :\t number of epochs of training to do. The model is saved after each epoch\n" +
+                   "\tBATCH :   \t the size of the training batches\n" +
+                   "\tMODEL_NAME :\t identifier put in the name of the files where the model is savec (OPTIONAL)\n" +
+                   "\tSAMPLE_NB :\t number of sequences randomly selected among the" +
+                   " training set, '-1' means all. (OPTIONAL)\n" +
+                   "\tTEST_FILE :\t path to a file containing a validation set (PAutomaC format) (OPTIONAL)\n"
+                   )
+                  .format(sys.argv[0]))
+        else:
+            print(("USAGE : {0} DEVICE TRAIN_FILE NEURONS EPOCHS BATCH [MODEL_NAME [SAMPLE_NB [TEST_FILE]]]\n" +
+                   "OR '{0} -h' for full help."
+                   )
+                  .format(sys.argv[0]))
+        sys.exit(-666)
     # ARGS :
     device = sys.argv[1]
     trainfile = sys.argv[2]

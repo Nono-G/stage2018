@@ -84,19 +84,24 @@ class SpexRandRNNW(SpexRandDrop):
 
 def main():
     if len(sys.argv) < 7 or len(sys.argv) > 9:
-        print(("Usage :: {0} DEVICE DIGESTFILE WEIGHTSFILE RANKS NB_PREFS NB_SUFFS [TEST_FILE [MODEL_FILE]]\n" +
-               "DEVICE : 'cuda' or 'cpu' or a specific cuda device such as 'cuda:2'\n" +
-               "DIGESTFILE : path to a digest file, produced by the model trainer\n" +
-               "WEIGHTSFILE : path to a weights file, produced by the model trainer\n" +
-               "RANKS : list of ranks to perform extractions, separated by '_' (e.g. '5_10_15_20')\n" +
-               "NB_PREFS : number of unique prefixes in the sub-block basis\n" +
-               "NB_SUFFS : number of unique suffixes in the sub-block basis\n" +
-               "TEST_FILE : path to a file containing test strings (OPTIONAL)\n" +
-               "MODEL_FILE : path to a file containing an automaton description (OPTIONAL)\n"
-               )
-              .format(sys.argv[0]))
+        if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == "-H" or sys.argv[1] == "h"):
+            print(("USAGE :: {0} DEVICE DIGESTFILE WEIGHTSFILE RANKS NB_PREFS NB_SUFFS [TEST_FILE [MODEL_FILE]]\n\n" +
+                   "\tDEVICE :\t 'cuda' or 'cpu' or a specific cuda device such as 'cuda:2'\n" +
+                   "\tDIGESTFILE :\t path to a digest file, produced by the model trainer\n" +
+                   "\tWEIGHTSFILE :\t path to a weights file, produced by the model trainer\n" +
+                   "\tRANKS :    \t list of ranks to perform extractions, separated by '_' (e.g. '5_10_15_20')\n" +
+                   "\tNB_PREFS :\t number of unique prefixes in the sub-block basis\n" +
+                   "\tNB_SUFFS :\t number of unique suffixes in the sub-block basis\n" +
+                   "\tTEST_FILE :\t path to a file containing test strings (OPTIONAL)\n" +
+                   "\tMODEL_FILE :\t path to a file containing an automaton description (OPTIONAL)\n"
+                   )
+                  .format(sys.argv[0]))
+        else:
+            print(("USAGE :: {0} DEVICE DIGESTFILE WEIGHTSFILE RANKS NB_PREFS NB_SUFFS [TEST_FILE [MODEL_FILE]]\n" +
+                   "OR '{0} -h' for full help."
+                   )
+                  .format(sys.argv[0]))
         sys.exit(-666)
-    # XXXXXX :
     context = ("H5-{0}l{1}c{2}"
                .format(sys.argv[3], sys.argv[5], sys.argv[6])
                .replace(" ", "_")
