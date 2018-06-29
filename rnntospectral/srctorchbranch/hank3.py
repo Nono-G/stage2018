@@ -128,7 +128,7 @@ class SpexRandDrop(SpexHush):
         #     for k in range(len(word)):
         #         acc *= predictions[i,k,word[k]]
         #     preds[i] = acc
-        preds = self.rnn_model.full_probas(words, self.batch_vol, self.hush, del_start_symb=True, device=self.device)
+        preds = self.rnn_model.full_probas(words, self.batch_vol, self.hush, device=self.device)
         if asdict:  # On retourne un dictionnaire
             probas = dict()
             for i in range(len(words)):

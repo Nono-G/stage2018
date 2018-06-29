@@ -138,12 +138,12 @@ def best_n_args(seq, n):
 def ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
     if dic_ref is None:
         try:
-            dic_ref = spex_commons.proba_all_prefixes_rnn(ref, words, del_start_symb=True)
+            dic_ref = spex_commons.proba_all_prefixes_rnn(ref, words)
         except AttributeError:
             dic_ref = spex_commons.proba_all_prefixes_aut(ref, words)
     if dic_approx is None:
         try:
-            dic_approx = spex_commons.proba_all_prefixes_rnn(approx, words, del_start_symb=True)
+            dic_approx = spex_commons.proba_all_prefixes_rnn(approx, words)
         except AttributeError:
             dic_approx = spex_commons.proba_all_prefixes_aut(approx, words)
     s = 0
@@ -157,7 +157,7 @@ def ndcg(words, ref, approx, ndcg_l=5, dic_ref=None, dic_approx=None):
             p = best_n_args(probas, ndcg_l)
             top = 0
             bottom = 0
-            for k in range(ndcg_l):  # 0 1 2 3 4
+            for k in range(ndcg_l):
                 log = math.log((k+2), 2)
                 top += (probas[a[k]])/log
                 bottom += (probas[p[k]])/log

@@ -95,6 +95,8 @@ def fit(model, epochs, train_loader, valid_loader=None, save_each_epoch=False):
     tf = time.time()
     t = tf-ti
     print("\nTotal training time : {0}, Average per epoch : {1}".format(t, t/epochs))
+    if valid_loader is not None:
+        print("Best epoch : {0} with validation loss = {1}".format(mini, val_losses[mini]))
 
 
 def parse(filestring):

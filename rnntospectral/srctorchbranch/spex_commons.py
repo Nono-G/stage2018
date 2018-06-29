@@ -33,7 +33,7 @@ class Spex:
         self.batch_vol = 1024
         self.randwords_minlen = 0
         self.randwords_maxlen = 100
-        self.randwords_nb = 20
+        self.randwords_nb = 1000
         # Debug Warning !
         if self.randwords_nb < 1000:
             print("DEBUG - DEBUG - DEBUG - DEBUG - DEBUG")
@@ -150,13 +150,13 @@ class Spex:
         self.x_test, _ = trainer.parse(self.metrics_test_set)
         self.x_rnnw = self.gen_with_rnn(nb=self.randwords_nb)
         self.y_test_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_test, bsize=self.batch_vol,
-                                                          del_start_symb=True, quiet=self.quiet, device=self.device)
+                                                          quiet=self.quiet, device=self.device)
 
         self.y_test_rnn, t, e = self.proba_words_normal(self.x_test, asdict=False, wer=True,
                                                         prefixes_dict=self.y_test_rnn_prefixes)
         self.wer_test_rnn = e / t
         self.y_rnnw_rnn_prefixes = proba_all_prefixes_rnn(self.rnn_model, self.x_rnnw, bsize=self.batch_vol,
-                                                          del_start_symb=True, quiet=self.quiet, device=self.device)
+                                                          quiet=self.quiet, device=self.device)
 
         self.y_rnnw_rnn, t, e = self.proba_words_normal(self.x_rnnw, asdict=False, wer=True,
                                                         prefixes_dict=self.y_rnnw_rnn_prefixes)
@@ -508,8 +508,8 @@ class Spex:
         total = 0
         errors = 0
         pr(1, self.quiet, "Fullwords probas...")
-        # start_factor = 1
-        start_factor = len(words) / sum([len(w) for w in words])
+        start_factor = 1
+        # start_factor = len(words) / sum([len(w) for w in words])
         for i, word in enumerate(words):
             indices = [x + 1 for x in word]
             indices.append(0)
@@ -688,9 +688,9 @@ def pr(indent=0, quiet=False, m="", end="\n"):
         sys.stdout.flush()
 
 
-def proba_all_prefixes_rnn(model, words, bsize=512, quiet=False, del_start_symb=False, device="cpu"):
+def proba_all_prefixes_rnn(model, words, bsize=512, quiet=False, device="cpu"):
     """Returns a dict containing next symbol probas after every prefix of every word given, using an rnn model"""
-    predictions = model.probas_tables_numpy(words, bsize, del_start_symb=del_start_symb, quiet=quiet, device=device)
+    predictions = model.probas_tables_numpy(words, bsize, quiet=quiet, device=device)
     preds_dict = dict()
     for i, w in enumerate(words):
         for k in range(len(w)+1):
@@ -698,7 +698,7 @@ def proba_all_prefixes_rnn(model, words, bsize=512, quiet=False, del_start_symb=
     return preds_dict
 
 
-def proba_all_prefixes_aut(model, words):
+def proba_all_prefixes_aut(model, words, end_symbol_first=True):
     """Returns a dict containing next symbol probas after every prefix of every word given, using an automaton model"""
     nalpha = model.nbL
     big_a = np.zeros((model.nbS, model.nbS))
@@ -721,14 +721,19 @@ def proba_all_prefixes_aut(model, words):
         for l in prefixes[i]:
             u = np.dot(u, model.transitions[l])
         probas = np.empty(nalpha + 1)
-        for symb in range(nalpha):
-            probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
-        probas[nalpha] = np.dot(u, model.final)
+        if end_symbol_first is True:
+            probas[0] = np.dot(u, model.final)
+            for symb in range(nalpha):
+                probas[symb+1] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
+        else:
+            for symb in range(nalpha):
+                probas[symb] = np.dot(np.dot(u, model.transitions[symb]), alpha_tilda_inf)
+            probas[nalpha] = np.dot(u, model.final)
         prefixes_dict[prefixes[i]] = probas
     return prefixes_dict
 
 
-def proba_next_aut(aut, prefix):
+def proba_next_aut(aut, prefix, end_symbol_first=True):
     """For a given automaton and a given prefix, output the probability distribution over symbols for the next symbol"""
     nalpha = aut.nbL
     big_a = np.zeros((aut.nbS, aut.nbS))
@@ -741,8 +746,14 @@ def proba_next_aut(aut, prefix):
     for l in prefix:
         u = np.dot(u, aut.transitions[l])
     probas = np.empty(nalpha + 1)
-    for symb in range(nalpha):
-        probas[symb] = np.dot(np.dot(u, aut.transitions[symb]), alpha_tilda_inf)
+    if end_symbol_first is True:
+        probas[0] = np.dot(u, aut.final)
+        for symb in range(nalpha):
+            probas[symb + 1] = np.dot(np.dot(u, aut.transitions[symb]), alpha_tilda_inf)
+    else:
+        for symb in range(nalpha):
+            probas[symb] = np.dot(np.dot(u, aut.transitions[symb]), alpha_tilda_inf)
+        probas[nalpha] = np.dot(u, aut.final)
     probas[nalpha] = np.dot(u, aut.final)
     return probas
 

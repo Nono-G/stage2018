@@ -8,6 +8,7 @@ from hank3 import SpexRandDrop, words_task
 
 """Executable file, extraction with rnn-generated basis"""
 
+
 class SpexRandRNNW(SpexRandDrop):
     """Override basis generation to use rnn-generated basis"""
     def __init__(self, digest, weights, pref_drop, suff_drop, m_test_set="", met_model="", context="", device="cpu"):
@@ -19,11 +20,11 @@ class SpexRandRNNW(SpexRandDrop):
     def gen_words_indexes_as_lists_para(self):
         nb_pref = self.pref_drop
         nb_suff = self.suff_drop
-
         hushed_words = set()
         hushed_prefixes = set()
         hushed_suffixes = set()
-        # random.seed
+        pref_updates = 0
+        suff_updates = 0
 
         with torch.no_grad():
             self.rnn_model.eval()
@@ -40,8 +41,10 @@ class SpexRandRNNW(SpexRandDrop):
                         if len(hushed_prefixes) < nb_pref:
                             hushed_prefixes.add(encoded_word)
                             hushed_prefixes.update(self.hush.prefixes_codes(encoded_word))
+                            pref_updates += 1
                         if len(hushed_suffixes) < nb_suff:
                             hushed_suffixes.update(self.hush.suffixes_codes(encoded_word))
+                            suff_updates += 1
                     else:
                         failed_words += 1
                     failures = 0
@@ -50,11 +53,10 @@ class SpexRandRNNW(SpexRandDrop):
                     failures += 1
         if failures >= self.patience:
                 pr(2, self.quiet, "Stopping words generation : out of patience")
-        pr(2, self.quiet,
-           "Nb of prefixes from rnn-gen words = {0}, expected = {1}".format(len(hushed_prefixes), nb_pref))
-        pr(2, self.quiet,
-           "Nb of suffixes from rnn-gen words = {0}, expected = {1}".format(len(hushed_suffixes), nb_suff))
-        #
+        pr(2, self.quiet, "Nb of prefixes from rnn-gen words = {0}, expected = {1}, in {2} updates"
+           .format(len(hushed_prefixes), nb_pref, pref_updates))
+        pr(2, self.quiet, "Nb of suffixes from rnn-gen words = {0}, expected = {1}, in {2} updates"
+           .format(len(hushed_suffixes), nb_suff, suff_updates))
         # On trie pour faire comme dans hankel.py, trick pour donner plus d'importance aux mots courts dans la SVD
         lig = sorted(list(hushed_prefixes))
         col = sorted(list(hushed_suffixes))
